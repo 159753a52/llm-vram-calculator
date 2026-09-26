@@ -10,7 +10,8 @@
   },
   "scripts": {
     "test": "node --test \"test/*.test.ts\"",
-    "model-spec": "node scripts/model-spec.mjs"
+    "model-spec": "node scripts/model-spec.mjs",
+    "export-data": "node scripts/export-data.mjs"
   },
   "keywords": [
     "llm",

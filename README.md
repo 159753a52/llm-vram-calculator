@@ -52,6 +52,42 @@ and cache plus the overhead.
 These are estimates. vLLM reserves a fixed share of GPU memory up front, and llama.cpp allocates the cache for
 the full context when it starts, so leave some headroom.
 
+## Data
+
+[`data/vram-requirements.csv`](data/vram-requirements.csv) and [`.json`](data/vram-requirements.json) list the
+weights and total GPU memory of every preset at ten precisions, with an 8,192-token FP16 cache, one request and the
+default overhead; `npm run export-data` regenerates them. Totals in GiB:
+
+| Model | Parameters | As published | Q8_0 | Q4_K_M | Q4_K_M at max context | KV cache per token (FP16) |
+|---|---|---|---|---|---|---|
+| Qwen3.8 27B | 27.8B | 58.0 | 31.3 | 18.3 | 35.3 (256K) | 64 KiB |
+| Qwen3.8 Flash Next (180B MoE) | 180.0B | 370 | 197 | 112 | 119 (256K) | 24 KiB |
+| Qwen3.8 2.4T-A95B (MoE) | 2.45T | 5,013 | 2,664 | 1,517 | 1,542 (256K) | 92 KiB |
+| Qwen3.5 9B | 9.7B | 20.6 | 11.3 | 6.8 | 15.3 (256K) | 32 KiB |
+| DeepSeek V4.1 Flash | 763.2B | 524 | 832 | 474 | 562 (1M) | 80 KiB |
+| DeepSeek V4 Flash | 290.9B | 165 | 318 | 182 | 275 (1M) | 86 KiB |
+| DeepSeek V4 Pro | 1.60T | 887 | 1,742 | 992 | 1,126 (1M) | 122 KiB |
+| GLM-5.3 | 753.3B | 775 | 821 | 468 | 564 (1M) | 87.8 KiB |
+| GLM-5.3 Flash | 321.3B | 337 | 350 | 200 | 212 (1M) | 11 KiB |
+| Gemma 4 31B | 31.3B | 65.8 | 35.7 | 21.1 | 31.7 (256K) | 40 KiB |
+| Gemma 4 26B-A4B (MoE) | 25.8B | 53.7 | 28.9 | 16.8 | 19.5 (256K) | 10 KiB |
+| Gemma 4 12B | 12.0B | 25.4 | 13.9 | 8.3 | 10.5 (256K) | 8 KiB |
+| Kimi K3 | 2.78T | 1,600 | 3,027 | 1,724 | 1,753 (1M) | 27 KiB |
+| MiniMax M3 | 427.0B | 877 | 466 | 266 | 397 (1M) | 120 KiB |
+| MiMo V2.6 Flash | 310.8B | 178 | 339 | 193 | 218 (1M) | 22.5 KiB |
+| Mistral Medium 3.5 128B | 127.7B | 140 | 143 | 82.7 | 176 (256K) | 352 KiB |
+| MiniCPM5 2B | 2.5B | 6.0 | 3.6 | 2.4 | 7.8 (128K) | 42 KiB |
+| Llama 3.1 8B | 8.0B | 18.1 | 10.3 | 6.6 | 23.1 (128K) | 128 KiB |
+| Llama 3.1 70B | 70.6B | 148 | 80.0 | 47.0 | 88.2 (128K) | 320 KiB |
+| Qwen3 8B | 8.2B | 18.5 | 10.7 | 6.8 | 11.8 (40K) | 144 KiB |
+| Qwen3 30B-A3B (MoE) | 30.5B | 63.9 | 34.6 | 20.2 | 23.6 (40K) | 96 KiB |
+| gpt-oss-20b | 20.9B | 14.8 | 23.5 | 13.7 | 16.8 (128K) | 24 KiB |
+| gpt-oss-120b | 116.8B | 67.7 | 128 | 73.2 | 77.9 (128K) | 36 KiB |
+| DeepSeek V3 / R1 (671B) | 684.5B | 706 | 746 | 425 | 437 (160K) | 68.6 KiB |
+
+DeepSeek V4's KV figures are upper bounds (see above). Free to reuse under the MIT license; a link back is
+appreciated.
+
 ## Use it as a library
 
 ```ts
