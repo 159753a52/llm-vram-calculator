@@ -44,6 +44,8 @@ export type ModelSpec = {
   slidingVHeadDim?: number;
   /** Layers with a fixed-size state instead of a KV cache (linear attention, Mamba). */
   stateLayers?: number;
+  /** What those layers are, for display; defaults to linear attention. */
+  stateKind?: string;
   maxContext?: number;
   /** Shown next to the result when the cache is known to be smaller than modelled here. */
   kvNote?: string;

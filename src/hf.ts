@@ -89,13 +89,17 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
     if (swaVHeadDim && swaVHeadDim !== spec.slidingHeadDim) spec.slidingVHeadDim = swaVHeadDim;
   }
 
-  // Hybrid models name their layer kinds in one of three ways: layer_types (most), a 0/1
-  // hybrid_layer_pattern with 1 for sliding-window layers (MiMo V2), or linear_attn_config's
-  // list of linear layers (Kimi).
+  // Hybrid models name their layer kinds in several ways: layer_types (most); a 0/1
+  // hybrid_layer_pattern with 1 for sliding-window layers (MiMo V2); linear_attn_config's list of
+  // linear layers (Kimi); one full-attention layer every full_attention_interval (Qwen3-Next);
+  // or a hybrid_override_pattern string where only "*" layers are attention (Nemotron-H: M is
+  // Mamba, E and - are feed-forward blocks).
   const layerTypes = Array.isArray(config.layer_types) ? config.layer_types : [];
   const pattern = Array.isArray(config.hybrid_layer_pattern) ? config.hybrid_layer_pattern : [];
   const linearConfig = (config.linear_attn_config as HubConfig | undefined) ?? {};
   const kdaLayers = Array.isArray(linearConfig.kda_layers) ? linearConfig.kda_layers.length : 0;
+  const overridePattern = typeof config.hybrid_override_pattern === 'string' ? config.hybrid_override_pattern : '';
+  const interval = positive(config.full_attention_interval);
   const window = positive(config.sliding_window);
   const slidingLayers = layerTypes.length
     ? layerTypes.filter((type) => type === 'sliding_attention').length
@@ -104,10 +108,16 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
     spec.slidingLayers = slidingLayers;
     spec.slidingWindow = window;
   }
-  const stateLayers = layerTypes.length
-    ? layerTypes.filter((type) => typeof type === 'string' && /linear|mamba|recurrent/.test(type)).length
-    : kdaLayers;
-  if (stateLayers) spec.stateLayers = stateLayers;
+  let stateLayers = kdaLayers;
+  if (layerTypes.length) {
+    stateLayers = layerTypes.filter((type) => typeof type === 'string' && /linear|mamba|recurrent/.test(type)).length;
+  } else if (overridePattern) {
+    stateLayers = layers - [...overridePattern].filter((kind) => kind === '*').length;
+    spec.stateKind = 'Mamba or feed-forward';
+  } else if (interval && interval > 1) {
+    stateLayers = layers - Math.floor(layers / interval);
+  }
+  if (stateLayers > 0) spec.stateLayers = stateLayers;
   if (config.kv_source_layer_ids || config.compress_ratios) {
     spec.kvNote =
       'This model shares and compresses its KV cache across layers, which the calculator does not model, so the KV cache figure is an upper bound.';

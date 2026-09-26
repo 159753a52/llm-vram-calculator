@@ -60,22 +60,33 @@ default overhead; `npm run export-data` regenerates them. Totals in GiB:
 
 | Model | Parameters | As published | Q8_0 | Q4_K_M | Q4_K_M at max context | KV cache per token (FP16) |
 |---|---|---|---|---|---|---|
+| Qwen3.6 35B-A3B (MoE) | 36.0B | 74.3 | 39.8 | 22.9 | 28.3 (256K) | 20 KiB |
+| Qwen3.6 27B | 27.8B | 58.0 | 31.3 | 18.3 | 35.3 (256K) | 64 KiB |
 | Qwen3.8 27B | 27.8B | 58.0 | 31.3 | 18.3 | 35.3 (256K) | 64 KiB |
 | Qwen3.8 Flash Next (180B MoE) | 180.0B | 370 | 197 | 112 | 119 (256K) | 24 KiB |
 | Qwen3.8 2.4T-A95B (MoE) | 2.45T | 5,013 | 2,664 | 1,517 | 1,542 (256K) | 92 KiB |
 | Qwen3.5 9B | 9.7B | 20.6 | 11.3 | 6.8 | 15.3 (256K) | 32 KiB |
+| Qwen3.5 122B-A10B (MoE) | 125.1B | 257 | 137 | 78.2 | 84.6 (256K) | 24 KiB |
+| Qwen3-Coder-Next (80B MoE) | 79.7B | 164 | 87.4 | 50.1 | 56.5 (256K) | 24 KiB |
 | DeepSeek V4.1 Flash | 763.2B | 524 | 832 | 474 | 562 (1M) | 80 KiB |
 | DeepSeek V4 Flash | 290.9B | 165 | 318 | 182 | 275 (1M) | 86 KiB |
 | DeepSeek V4 Pro | 1.60T | 887 | 1,742 | 992 | 1,126 (1M) | 122 KiB |
+| DeepSeek V3.2 | 685.4B | 707 | 747 | 426 | 437 (160K) | 68.6 KiB |
 | GLM-5.3 | 753.3B | 775 | 821 | 468 | 564 (1M) | 87.8 KiB |
 | GLM-5.3 Flash | 321.3B | 337 | 350 | 200 | 212 (1M) | 11 KiB |
+| GLM-5.2 | 753.3B | 1,545 | 821 | 468 | 564 (1M) | 87.8 KiB |
+| GLM-4.7 Flash | 31.2B | 64.9 | 34.9 | 20.3 | 31.1 (198K) | 52.9 KiB |
 | Gemma 4 31B | 31.3B | 65.8 | 35.7 | 21.1 | 31.7 (256K) | 40 KiB |
 | Gemma 4 26B-A4B (MoE) | 25.8B | 53.7 | 28.9 | 16.8 | 19.5 (256K) | 10 KiB |
 | Gemma 4 12B | 12.0B | 25.4 | 13.9 | 8.3 | 10.5 (256K) | 8 KiB |
 | Kimi K3 | 2.78T | 1,600 | 3,027 | 1,724 | 1,753 (1M) | 27 KiB |
 | MiniMax M3 | 427.0B | 877 | 466 | 266 | 397 (1M) | 120 KiB |
+| MiniMax M2.7 | 228.7B | 238 | 252 | 144 | 196 (200K) | 248 KiB |
 | MiMo V2.6 Flash | 310.8B | 178 | 339 | 193 | 218 (1M) | 22.5 KiB |
 | Mistral Medium 3.5 128B | 127.7B | 140 | 143 | 82.7 | 176 (256K) | 352 KiB |
+| Nemotron 3 Nano 4B | 4.0B | 8.8 | 5.0 | 3.1 | 7.4 (256K) | 16 KiB |
+| Nemotron 3 Nano 30B-A3B (MoE) | 31.6B | 65.2 | 34.9 | 20.1 | 21.7 (256K) | 6 KiB |
+| Nemotron 3 Super 120B-A12B (MoE) | 123.6B | 254 | 135 | 77.2 | 79.3 (256K) | 8 KiB |
 | MiniCPM5 2B | 2.5B | 6.0 | 3.6 | 2.4 | 7.8 (128K) | 42 KiB |
 | Llama 3.1 8B | 8.0B | 18.1 | 10.3 | 6.6 | 23.1 (128K) | 128 KiB |
 | Llama 3.1 70B | 70.6B | 148 | 80.0 | 47.0 | 88.2 (128K) | 320 KiB |

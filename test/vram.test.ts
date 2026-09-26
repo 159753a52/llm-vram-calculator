@@ -231,6 +231,23 @@ test('specFromHub reads the hybrid layouts of MiMo, Kimi and DeepSeek V4', () =>
   assert.equal(specFromHub('x/plain', { num_hidden_layers: 2, num_attention_heads: 2, head_dim: 64 }, info).kvNote, undefined);
 });
 
+test('specFromHub counts attention layers in Qwen3-Next and Nemotron-H layouts', () => {
+  const info = { safetensors: { total: 1e9 } };
+  const next = specFromHub(
+    'x/qwen3-next',
+    { num_hidden_layers: 48, num_attention_heads: 16, num_key_value_heads: 2, head_dim: 256, full_attention_interval: 4 },
+    info,
+  );
+  assert.equal(next.stateLayers, 36);
+  const nemotron = specFromHub(
+    'x/nemotron-h',
+    { num_hidden_layers: 8, num_attention_heads: 32, num_key_value_heads: 2, head_dim: 128, hybrid_override_pattern: 'MEM*EME*' },
+    info,
+  );
+  assert.deepEqual([nemotron.stateLayers, nemotron.stateKind], [6, 'Mamba or feed-forward']);
+  assert.equal(kvCacheBytes(nemotron, 1_000, 1, 16), 2 * 1_000 * 2 * 2 * 128 * 2);
+});
+
 test('the presets behind the FAQ: linear layers in Qwen3.8 27B and Kimi K3', () => {
   assert.deepEqual([preset('Qwen/Qwen3.8-27B').stateLayers, preset('Qwen/Qwen3.8-27B').layers], [48, 64]);
   assert.deepEqual([preset('moonshotai/Kimi-K3').stateLayers, preset('moonshotai/Kimi-K3').layers], [69, 93]);
