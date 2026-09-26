@@ -5,6 +5,21 @@ import type { ModelSpec } from './vram.ts';
 // model can be loaded from the Hub with loadFromHub().
 export const PRESETS: ModelSpec[] = [
   {
+    id: 'deepseek-ai/DeepSeek-V4-Flash-0731',
+    name: 'DeepSeek V4 Flash 0731',
+    params: 304_180_418_494,
+    dtypes: { BF16: 1_483_567_488, I64: 2_327_040, F32: 37_741_630, F8_E4M3: 6_304_038_912, I8: 296_352_743_424 },
+    layers: 43,
+    kvHeads: 1,
+    headDim: 512,
+    experts: 256,
+    publishedBytes: 166_886_535_336,
+    quantMethod: 'fp8',
+    kvNote: 'This model shares and compresses its KV cache across layers, which the calculator does not model, so the KV cache figure is an upper bound.',
+    maxContext: 1_048_576,
+    activeParams: 13_000_000_000,
+  },
+  {
     id: 'Qwen/Qwen3.6-35B-A3B',
     name: 'Qwen3.6 35B-A3B (MoE)',
     params: 35_951_822_704,

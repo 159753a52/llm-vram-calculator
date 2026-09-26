@@ -63,6 +63,7 @@ default overhead; `npm run export-data` regenerates them. Totals in GiB:
 
 | Model | Parameters | As published | Q8_0 | Q4_K_M | Q4_K_M at max context | KV cache per token (FP16) |
 |---|---|---|---|---|---|---|
+| DeepSeek V4 Flash 0731 | 304.2B | 172 | 332 | 190 | 284 (1M) | 86 KiB |
 | Qwen3.6 35B-A3B (MoE) | 36.0B | 74.3 | 39.8 | 22.9 | 28.3 (256K) | 20 KiB |
 | Qwen3.6 27B | 27.8B | 58.0 | 31.3 | 18.3 | 35.3 (256K) | 64 KiB |
 | Qwen3.8 27B | 27.8B | 58.0 | 31.3 | 18.3 | 35.3 (256K) | 64 KiB |
