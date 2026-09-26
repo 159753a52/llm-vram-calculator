@@ -1,0 +1,28 @@
+{
+  "name": "llm-vram-calculator",
+  "version": "1.0.0",
+  "description": "Estimate GPU memory for LLM inference from any Hugging Face model: weights, KV cache and overhead, with MoE, MLA, sliding-window layers and MXFP4 handled.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.ts\""
+  },
+  "keywords": [
+    "llm",
+    "vram",
+    "gpu",
+    "kv-cache",
+    "huggingface",
+    "quantization",
+    "calculator"
+  ],
+  "homepage": "https://toolsite-static.pages.dev/llm-vram-calculator/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/159753a52/llm-vram-calculator.git"
+  }
+}
