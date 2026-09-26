@@ -27,6 +27,7 @@ So new models work the day they are uploaded, and newer architectures come out r
 | Linear-attention and state-space layers | No KV cache that grows with context: 48 of Qwen3.8 27B's 64 layers, 69 of Kimi K3's 93 (from `linear_attn_config`). |
 | Sparse-attention indexer (DeepSeek V3.2, GLM-5) | The indexer keeps its own FP8 key per token (`index_head_dim`, 128 values), in every layer or, for GLM-5, only in the layers listed as `full` in `indexer_types`. |
 | Hybrid layouts named other ways | `full_attention_interval` (Qwen3-Next: one full-attention layer in four) and Nemotron-H's `hybrid_override_pattern` (only `*` layers are attention). |
+| Layers that reuse an earlier cache (Gemma 4 E models) | `num_kv_shared_layers`: the last layers keep no cache of their own, 18 of Gemma 4 E4B's 42. |
 | Cross-layer cache sharing (DeepSeek V4) | Not modelled; the model carries a note that its KV figure is an upper bound. |
 
 "As published" is the size of the `.safetensors` files in the repository root (Mistral's duplicate
@@ -81,14 +82,18 @@ default overhead; `npm run export-data` regenerates them. Totals in GiB:
 | Gemma 4 31B | 31.3B | 65.8 | 35.7 | 21.1 | 31.7 (256K) | 40 KiB |
 | Gemma 4 26B-A4B (MoE) | 25.8B | 53.7 | 28.9 | 16.8 | 19.5 (256K) | 10 KiB |
 | Gemma 4 12B | 12.0B | 25.4 | 13.9 | 8.3 | 10.5 (256K) | 8 KiB |
+| Gemma 4 E4B | 8.0B | 17.0 | 9.4 | 5.6 | 7.7 (128K) | 16 KiB |
 | Kimi K3 | 2.78T | 1,600 | 3,027 | 1,724 | 1,753 (1M) | 27 KiB |
 | MiniMax M3 | 427.0B | 877 | 466 | 266 | 397 (1M) | 120 KiB |
 | MiniMax M2.7 | 228.7B | 238 | 252 | 144 | 196 (200K) | 248 KiB |
 | MiMo V2.6 Flash | 310.8B | 178 | 339 | 193 | 218 (1M) | 22.5 KiB |
+| MiMo V2.6 Pro | 1.02T | 581 | 1,116 | 636 | 690 (1M) | 50 KiB |
 | Mistral Medium 3.5 128B | 127.7B | 140 | 143 | 82.7 | 176 (256K) | 352 KiB |
 | Nemotron 3 Nano 4B | 4.0B | 8.8 | 5.0 | 3.1 | 7.4 (256K) | 16 KiB |
 | Nemotron 3 Nano 30B-A3B (MoE) | 31.6B | 65.2 | 34.9 | 20.1 | 21.7 (256K) | 6 KiB |
 | Nemotron 3 Super 120B-A12B (MoE) | 123.6B | 254 | 135 | 77.2 | 79.3 (256K) | 8 KiB |
+| Xing 4.0 29B-A4B (MoE) | 31.2B | 64.8 | 34.9 | 20.2 | 32.2 (256K) | 45 KiB |
+| Muse Glimmer 30B | 29.8B | 61.7 | 33.1 | 19.1 | 20.8 (128K) | 13 KiB |
 | MiniCPM5 2B | 2.5B | 6.0 | 3.6 | 2.4 | 7.8 (128K) | 42 KiB |
 | Llama 3.1 8B | 8.0B | 18.1 | 10.3 | 6.6 | 23.1 (128K) | 128 KiB |
 | Llama 3.1 70B | 70.6B | 148 | 80.0 | 47.0 | 88.2 (128K) | 320 KiB |

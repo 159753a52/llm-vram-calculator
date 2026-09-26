@@ -258,6 +258,27 @@ test('DeepSeek sparse attention adds an FP8 indexer key per token, fewer when la
   assert.equal(kvCacheBytes(glm, 10, 1, 16), 10 * (8 * 576 * 2 + 3 * 128));
 });
 
+test('Gemma 4 E models: the last layers reuse earlier caches and keep none of their own', () => {
+  const pattern = Array.from({ length: 12 }, (_, i) => (i % 6 === 5 ? 'full_attention' : 'sliding_attention'));
+  const spec = specFromHub(
+    'x/gemma-e',
+    {
+      num_hidden_layers: 12,
+      num_attention_heads: 8,
+      num_key_value_heads: 2,
+      head_dim: 256,
+      global_head_dim: 512,
+      sliding_window: 512,
+      num_kv_shared_layers: 6,
+      layer_types: pattern,
+    },
+    { safetensors: { total: 1e9 } },
+  );
+  // Own caches in layers 0-5 only: five sliding layers and one global layer.
+  assert.deepEqual([spec.sharedKvLayers, spec.slidingLayers, spec.kvHeads, spec.headDim], [6, 5, 2, 512]);
+  assert.equal(kvCacheBytes(spec, 1_000, 1, 16), (1 * 1_000 * 2 * 1_024 + 5 * 512 * 2 * 512) * 2);
+});
+
 test('specFromHub counts attention layers in Qwen3-Next and Nemotron-H layouts', () => {
   const info = { safetensors: { total: 1e9 } };
   const next = specFromHub(

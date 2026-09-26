@@ -108,8 +108,12 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
   const overridePattern = typeof config.hybrid_override_pattern === 'string' ? config.hybrid_override_pattern : '';
   const interval = positive(config.full_attention_interval);
   const window = positive(config.sliding_window);
+  // Gemma 4's small models let their last layers reuse the cache of earlier ones.
+  const shared = Math.min(positive(config.num_kv_shared_layers) ?? 0, layers);
+  if (shared) spec.sharedKvLayers = shared;
+  const ownTypes = layerTypes.slice(0, layers - shared);
   const slidingLayers = layerTypes.length
-    ? layerTypes.filter((type) => type === 'sliding_attention').length
+    ? ownTypes.filter((type) => type === 'sliding_attention').length
     : pattern.filter((kind) => kind === 1).length;
   if (slidingLayers && window) {
     spec.slidingLayers = slidingLayers;
@@ -117,7 +121,7 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
   }
   let stateLayers = kdaLayers;
   if (layerTypes.length) {
-    stateLayers = layerTypes.filter((type) => typeof type === 'string' && /linear|mamba|recurrent/.test(type)).length;
+    stateLayers = ownTypes.filter((type) => typeof type === 'string' && /linear|mamba|recurrent/.test(type)).length;
   } else if (overridePattern) {
     stateLayers = layers - [...overridePattern].filter((kind) => kind === '*').length;
     spec.stateKind = 'Mamba or feed-forward';

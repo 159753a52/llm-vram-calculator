@@ -58,6 +58,8 @@ export type ModelSpec = {
   stateLayers?: number;
   /** What those layers are, for display; defaults to linear attention. */
   stateKind?: string;
+  /** Layers that reuse an earlier layer's cache instead of keeping their own (Gemma 4 E models). */
+  sharedKvLayers?: number;
   maxContext?: number;
   /** Shown next to the result when the cache is known to be smaller than modelled here. */
   kvNote?: string;
@@ -128,8 +130,12 @@ export function slidingValuesPerTokenPerLayer(spec: ModelSpec): number {
 }
 
 /** KV cache for `requests` sequences of `context` tokens each. */
+/** Layers that keep their own KV cache: everything but state layers and cache-sharing layers. */
+const cachingLayers = (spec: ModelSpec) =>
+  Math.max(0, spec.layers - (spec.stateLayers ?? 0) - (spec.sharedKvLayers ?? 0));
+
 export function kvCacheBytes(spec: ModelSpec, context: number, requests: number, kvBits: number): number {
-  const attentionLayers = Math.max(0, spec.layers - (spec.stateLayers ?? 0));
+  const attentionLayers = cachingLayers(spec);
   const sliding = Math.min(spec.slidingLayers ?? 0, attentionLayers);
   const full = attentionLayers - sliding;
   const slidingTokens = Math.min(context, spec.slidingWindow ?? context);
@@ -141,13 +147,13 @@ export function kvCacheBytes(spec: ModelSpec, context: number, requests: number,
 /** The sparse-attention indexer's own cache, kept in FP8 whatever the KV cache precision. */
 function indexerBytesPerToken(spec: ModelSpec): number {
   if (!spec.indexDim) return 0;
-  const attentionLayers = Math.max(0, spec.layers - (spec.stateLayers ?? 0) - (spec.slidingLayers ?? 0));
+  const attentionLayers = Math.max(0, cachingLayers(spec) - (spec.slidingLayers ?? 0));
   return Math.min(spec.indexLayers ?? attentionLayers, attentionLayers) * spec.indexDim;
 }
 
 /** Cache added by each extra token of one request once every sliding window is full. */
 export function kvGrowthPerToken(spec: ModelSpec, kvBits: number): number {
-  const attentionLayers = Math.max(0, spec.layers - (spec.stateLayers ?? 0));
+  const attentionLayers = cachingLayers(spec);
   const full = attentionLayers - Math.min(spec.slidingLayers ?? 0, attentionLayers);
   return (full * kvValuesPerTokenPerLayer(spec) * kvBits) / 8 + indexerBytesPerToken(spec);
 }
