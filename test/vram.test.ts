@@ -231,6 +231,33 @@ test('specFromHub reads the hybrid layouts of MiMo, Kimi and DeepSeek V4', () =>
   assert.equal(specFromHub('x/plain', { num_hidden_layers: 2, num_attention_heads: 2, head_dim: 64 }, info).kvNote, undefined);
 });
 
+test('DeepSeek sparse attention adds an FP8 indexer key per token, fewer when layers share it', () => {
+  const info = { safetensors: { total: 1e9 } };
+  const v32 = specFromHub(
+    'x/dsv32',
+    { num_hidden_layers: 61, num_attention_heads: 128, kv_lora_rank: 512, qk_rope_head_dim: 64, index_head_dim: 128 },
+    info,
+  );
+  assert.deepEqual([v32.mlaDim, v32.indexDim, v32.indexLayers], [576, 128, undefined]);
+  assert.equal(kvCacheBytes(v32, 1, 1, 16), 61 * (576 * 2 + 128));
+  assert.equal(kvGrowthPerToken(v32, 8), 61 * (576 + 128));
+
+  const glm = specFromHub(
+    'x/glm5',
+    {
+      num_hidden_layers: 8,
+      num_attention_heads: 64,
+      kv_lora_rank: 512,
+      qk_rope_head_dim: 64,
+      index_head_dim: 128,
+      indexer_types: ['full', 'full', 'shared', 'shared', 'full', 'shared', 'shared', 'shared'],
+    },
+    info,
+  );
+  assert.equal(glm.indexLayers, 3);
+  assert.equal(kvCacheBytes(glm, 10, 1, 16), 10 * (8 * 576 * 2 + 3 * 128));
+});
+
 test('specFromHub counts attention layers in Qwen3-Next and Nemotron-H layouts', () => {
   const info = { safetensors: { total: 1e9 } };
   const next = specFromHub(

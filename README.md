@@ -25,6 +25,8 @@ So new models work the day they are uploaded, and newer architectures come out r
 | Sliding-window layers | Layers listed as `sliding_attention` in `layer_types`, or marked 1 in MiMo's `hybrid_layer_pattern`, cache only the window (gpt-oss: 128 tokens on half of its layers). |
 | Different cache shapes per layer kind | Gemma 4's global layers cache 4 heads of 512 values that serve as both keys and values, its sliding layers 16 heads of 256; MiMo V2 caches 192-wide keys and 128-wide values. |
 | Linear-attention and state-space layers | No KV cache that grows with context: 48 of Qwen3.8 27B's 64 layers, 69 of Kimi K3's 93 (from `linear_attn_config`). |
+| Sparse-attention indexer (DeepSeek V3.2, GLM-5) | The indexer keeps its own FP8 key per token (`index_head_dim`, 128 values), in every layer or, for GLM-5, only in the layers listed as `full` in `indexer_types`. |
+| Hybrid layouts named other ways | `full_attention_interval` (Qwen3-Next: one full-attention layer in four) and Nemotron-H's `hybrid_override_pattern` (only `*` layers are attention). |
 | Cross-layer cache sharing (DeepSeek V4) | Not modelled; the model carries a note that its KV figure is an upper bound. |
 
 "As published" is the size of the `.safetensors` files in the repository root (Mistral's duplicate
@@ -71,10 +73,10 @@ default overhead; `npm run export-data` regenerates them. Totals in GiB:
 | DeepSeek V4.1 Flash | 763.2B | 524 | 832 | 474 | 562 (1M) | 80 KiB |
 | DeepSeek V4 Flash | 290.9B | 165 | 318 | 182 | 275 (1M) | 86 KiB |
 | DeepSeek V4 Pro | 1.60T | 887 | 1,742 | 992 | 1,126 (1M) | 122 KiB |
-| DeepSeek V3.2 | 685.4B | 707 | 747 | 426 | 437 (160K) | 68.6 KiB |
-| GLM-5.3 | 753.3B | 775 | 821 | 468 | 564 (1M) | 87.8 KiB |
-| GLM-5.3 Flash | 321.3B | 337 | 350 | 200 | 212 (1M) | 11 KiB |
-| GLM-5.2 | 753.3B | 1,545 | 821 | 468 | 564 (1M) | 87.8 KiB |
+| DeepSeek V3.2 | 685.4B | 708 | 747 | 426 | 438 (160K) | 76.3 KiB |
+| GLM-5.3 | 753.3B | 775 | 821 | 468 | 567 (1M) | 90.4 KiB |
+| GLM-5.3 Flash | 321.3B | 337 | 350 | 200 | 213 (1M) | 12.4 KiB |
+| GLM-5.2 | 753.3B | 1,545 | 821 | 468 | 567 (1M) | 90.4 KiB |
 | GLM-4.7 Flash | 31.2B | 64.9 | 34.9 | 20.3 | 31.1 (198K) | 52.9 KiB |
 | Gemma 4 31B | 31.3B | 65.8 | 35.7 | 21.1 | 31.7 (256K) | 40 KiB |
 | Gemma 4 26B-A4B (MoE) | 25.8B | 53.7 | 28.9 | 16.8 | 19.5 (256K) | 10 KiB |

@@ -32,6 +32,12 @@ export type ModelSpec = {
   vHeadDim?: number;
   /** Multi-head latent attention (DeepSeek V2/V3): values cached per token per layer. */
   mlaDim?: number;
+  /**
+   * DeepSeek sparse attention (DeepSeek V3.2, GLM-5): the indexer also caches `indexDim` FP8
+   * values per token, in `indexLayers` layers (every full-attention layer unless shared).
+   */
+  indexDim?: number;
+  indexLayers?: number;
   /** Layers that keep only the last `slidingWindow` tokens. */
   slidingLayers?: number;
   slidingWindow?: number;
@@ -123,14 +129,21 @@ export function kvCacheBytes(spec: ModelSpec, context: number, requests: number,
   const slidingTokens = Math.min(context, spec.slidingWindow ?? context);
   const values =
     full * context * kvValuesPerTokenPerLayer(spec) + sliding * slidingTokens * slidingValuesPerTokenPerLayer(spec);
-  return (requests * values * kvBits) / 8;
+  return requests * ((values * kvBits) / 8 + context * indexerBytesPerToken(spec));
+}
+
+/** The sparse-attention indexer's own cache, kept in FP8 whatever the KV cache precision. */
+function indexerBytesPerToken(spec: ModelSpec): number {
+  if (!spec.indexDim) return 0;
+  const attentionLayers = Math.max(0, spec.layers - (spec.stateLayers ?? 0) - (spec.slidingLayers ?? 0));
+  return Math.min(spec.indexLayers ?? attentionLayers, attentionLayers) * spec.indexDim;
 }
 
 /** Cache added by each extra token of one request once every sliding window is full. */
 export function kvGrowthPerToken(spec: ModelSpec, kvBits: number): number {
   const attentionLayers = Math.max(0, spec.layers - (spec.stateLayers ?? 0));
   const full = attentionLayers - Math.min(spec.slidingLayers ?? 0, attentionLayers);
-  return (full * kvValuesPerTokenPerLayer(spec) * kvBits) / 8;
+  return (full * kvValuesPerTokenPerLayer(spec) * kvBits) / 8 + indexerBytesPerToken(spec);
 }
 
 /** Memory every GPU needs no matter how small the model: the CUDA context and allocator pools. */

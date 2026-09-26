@@ -67,6 +67,13 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
   // DeepSeek-style MLA caches one compressed latent plus the rotary part of the key.
   const kvLoraRank = positive(config.kv_lora_rank);
   if (kvLoraRank) spec.mlaDim = kvLoraRank + (positive(config.qk_rope_head_dim) ?? 0);
+  // DeepSeek sparse attention keeps an indexer key per token; GLM-5 lets some layers share one.
+  const indexDim = positive(config.index_head_dim);
+  if (kvLoraRank && indexDim) {
+    spec.indexDim = indexDim;
+    const indexerTypes = Array.isArray(config.indexer_types) ? config.indexer_types : [];
+    if (indexerTypes.length) spec.indexLayers = indexerTypes.filter((type) => type === 'full').length;
+  }
   const vHeadDim = positive(config.v_head_dim);
   if (!kvLoraRank && vHeadDim && vHeadDim !== headDim) spec.vHeadDim = vHeadDim;
 

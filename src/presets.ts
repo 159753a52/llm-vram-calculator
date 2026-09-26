@@ -159,6 +159,7 @@ export const PRESETS: ModelSpec[] = [
     publishedBytes: 689_483_049_129,
     quantMethod: 'fp8',
     mlaDim: 576,
+    indexDim: 128,
     maxContext: 163_840,
   },
   {
@@ -173,6 +174,8 @@ export const PRESETS: ModelSpec[] = [
     publishedBytes: 755_632_050_320,
     quantMethod: 'fp8',
     mlaDim: 576,
+    indexDim: 128,
+    indexLayers: 21,
     maxContext: 1_048_576,
   },
   {
@@ -187,6 +190,8 @@ export const PRESETS: ModelSpec[] = [
     publishedBytes: 328_337_455_672,
     quantMethod: 'fp8',
     mlaDim: 512,
+    indexDim: 128,
+    indexLayers: 45,
     stateLayers: 34,
     maxContext: 1_048_576,
   },
@@ -201,6 +206,8 @@ export const PRESETS: ModelSpec[] = [
     experts: 256,
     publishedBytes: 1_506_667_387_408,
     mlaDim: 576,
+    indexDim: 128,
+    indexLayers: 21,
     maxContext: 1_048_576,
   },
   {
