@@ -15,6 +15,12 @@ export type ModelSpec = {
   dtypes?: Record<string, number>;
   /** Routed experts of a mixture-of-experts model; all of them sit in memory. */
   experts?: number;
+  /**
+   * Parameters a mixture-of-experts model uses per token, from its model card; `activeEstimated`
+   * marks the few worked out from config.json because the card gives no number.
+   */
+  activeParams?: number;
+  activeEstimated?: boolean;
   /** quantization_config.quant_method, e.g. "mxfp4" or "fp8". */
   quantMethod?: string;
   /**

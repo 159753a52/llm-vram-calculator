@@ -21,6 +21,7 @@ const rows = PRESETS.map((spec) => {
     hf_id: spec.id,
     params: spec.params,
     experts: spec.experts ?? '',
+    active_params: spec.activeParams ?? '',
     layers: spec.layers,
     max_context: spec.maxContext ?? '',
     kv_kib_per_token_fp16: Math.round((kvGrowthPerToken(spec, 16) / 1024) * 10) / 10,

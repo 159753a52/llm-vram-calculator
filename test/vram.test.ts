@@ -279,6 +279,8 @@ test('the presets behind the FAQ: linear layers in Qwen3.8 27B and Kimi K3', () 
   assert.deepEqual([preset('Qwen/Qwen3.8-27B').stateLayers, preset('Qwen/Qwen3.8-27B').layers], [48, 64]);
   assert.deepEqual([preset('moonshotai/Kimi-K3').stateLayers, preset('moonshotai/Kimi-K3').layers], [69, 93]);
   assert.equal(preset('zai-org/GLM-5.3').mlaDim, 576);
+  assert.equal(preset('deepseek-ai/DeepSeek-V3.2').indexDim, 128);
+  assert.equal(preset('Qwen/Qwen3.6-35B-A3B').activeParams, 3e9);
   const gemma = preset('google/gemma-4-31B-it');
   assert.deepEqual([gemma.slidingLayers, gemma.layers, gemma.slidingWindow, gemma.kvHeads, gemma.headDim], [50, 60, 1024, 4, 512]);
   assert.match(preset('deepseek-ai/DeepSeek-V4.1-Flash').kvNote ?? '', /upper bound/);
