@@ -111,7 +111,7 @@ appreciated.
 `src/speed.ts` estimates how many tokens per second one request generates: every token reads the active
 weights and the whole KV cache once, so the ceiling is memory bandwidth divided by those bytes. Engines reach
 55–75% of it with dense models and 30–50% with mixture-of-experts models, plus 0.5–1.5 ms of fixed cost per
-token. That puts Llama 3.1 8B at Q4_K_M on an RTX 4090 at 96–143 tokens/s (about 130 measured) and
+token, and 0.8–2 ms more when cards in tensor parallel exchange results after every layer. That puts Llama 3.1 8B at Q4_K_M on an RTX 4090 at 96–143 tokens/s (about 130 measured) and
 Qwen3-30B-A3B at 121–219 (about 170 measured), with a 512-token context. Online: https://toolsite-static.pages.dev/llm-speed-calculator/
 
 ## Use it as a library

@@ -47,6 +47,8 @@ test('tensor parallel adds up the bandwidth of the cards', () => {
   const one = tokensPerSecond(spec, precision('fp8'), 4096, 16, gpu('H100 SXM'));
   const two = tokensPerSecond(spec, precision('fp8'), 4096, 16, gpu('H100 SXM'), 2);
   assert.equal(two.limit, one.limit * 2);
+  // Swapping results between the cards after every layer keeps it below twice as fast.
+  assert.ok(two.high < one.high * 2 && two.high > one.high, formatRange(two));
 });
 
 test('the FAQ numbers', () => {

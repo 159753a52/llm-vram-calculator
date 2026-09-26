@@ -33,6 +33,8 @@ export const SPEED_GPUS: SpeedGpu[] = [
  */
 export const EFFICIENCY = { dense: [0.55, 0.75], moe: [0.3, 0.5] } as const;
 export const FIXED_MS = [1.5, 0.5] as const;
+/** Cards in tensor parallel swap partial results after every layer: extra time per token. */
+export const TENSOR_PARALLEL_MS = [2, 0.8] as const;
 
 /** Weight bytes read for every generated token: all of a dense model, the active part of an MoE. */
 export function activeWeightBytes(spec: ModelSpec, precision: Precision): number {
@@ -59,8 +61,9 @@ export function tokensPerSecond(
   const bytes = bytesPerToken(spec, precision, context, kvBits);
   const limit = (gpu.bandwidth * 1e9 * gpus) / bytes;
   const [low, high] = spec.activeParams && spec.activeParams < spec.params ? EFFICIENCY.moe : EFFICIENCY.dense;
+  const fixed = (i: 0 | 1) => FIXED_MS[i] + (gpus > 1 ? TENSOR_PARALLEL_MS[i] : 0);
   const speed = (efficiency: number, fixedMs: number) => 1 / (1 / (limit * efficiency) + fixedMs / 1000);
-  return { limit, low: speed(low, FIXED_MS[0]), high: speed(high, FIXED_MS[1]), bytes };
+  return { limit, low: speed(low, fixed(0)), high: speed(high, fixed(1)), bytes };
 }
 
 /** "120–165" or, below 10, one decimal: "3.1–4.2". */
