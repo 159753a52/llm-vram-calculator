@@ -6,8 +6,18 @@ export type SpeedGpu = { name: string; gib: number; bandwidth: number; note?: st
 // Bandwidths from the makers' spec sheets. Unified-memory machines let the GPU use about 75% of
 // their memory by default, so `gib` is 75% of what they are sold with.
 export const SPEED_GPUS: SpeedGpu[] = [
+  { name: 'RTX 4060 8GB', gib: 8, bandwidth: 272 },
   { name: 'RTX 3060 12GB', gib: 12, bandwidth: 360 },
+  { name: 'Arc B580 12GB', gib: 12, bandwidth: 456 },
+  { name: 'RTX 4070 12GB', gib: 12, bandwidth: 504 },
+  { name: 'RTX 5070 12GB', gib: 12, bandwidth: 672 },
   { name: 'RTX 4060 Ti 16GB', gib: 16, bandwidth: 288 },
+  { name: 'RTX 5060 Ti 16GB', gib: 16, bandwidth: 448 },
+  { name: 'RX 9070 XT 16GB', gib: 16, bandwidth: 644 },
+  { name: 'RTX 4070 Ti Super 16GB', gib: 16, bandwidth: 672 },
+  { name: 'RTX 4080 Super 16GB', gib: 16, bandwidth: 736 },
+  { name: 'RTX 5070 Ti 16GB', gib: 16, bandwidth: 896 },
+  { name: 'RTX 5080 16GB', gib: 16, bandwidth: 960 },
   { name: 'RTX 3090', gib: 24, bandwidth: 936 },
   { name: 'RTX 4090', gib: 24, bandwidth: 1008 },
   { name: 'RX 7900 XTX', gib: 24, bandwidth: 960 },
