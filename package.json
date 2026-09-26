@@ -9,7 +9,8 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "test": "node --test \"test/*.test.ts\""
+    "test": "node --test \"test/*.test.ts\"",
+    "model-spec": "node scripts/model-spec.mjs"
   },
   "keywords": [
     "llm",

@@ -4,6 +4,22 @@ type HubConfig = Record<string, unknown>;
 export type HubInfo = {
   safetensors?: { total?: number; parameters?: Record<string, number> };
 };
+/** An entry of the Hub's file listing (api/models/<id>/tree/main). */
+export type HubFile = { type?: string; path: string; size?: number; lfs?: { size?: number } };
+
+/**
+ * Total size of the .safetensors files in the repository root, or undefined if there are none.
+ * Shard names vary (MiMo uses model_pp0_ep3_shard0.safetensors), so every root file counts
+ * except Mistral's consolidated.safetensors, a second copy of the same weights. Subfolders hold
+ * extras such as draft models and audio tokenizers.
+ */
+export function publishedWeightBytes(files: HubFile[]): number | undefined {
+  const total = files
+    .filter((file) => file.type !== 'directory' && !file.path.includes('/'))
+    .filter((file) => file.path.endsWith('.safetensors') && !file.path.startsWith('consolidated'))
+    .reduce((sum, file) => sum + (file.lfs?.size ?? file.size ?? 0), 0);
+  return total > 0 ? total : undefined;
+}
 
 const HUB = 'https://huggingface.co';
 
@@ -15,7 +31,7 @@ const positive = (value: unknown): number | undefined =>
  * counts in the safetensors metadata. Layers not listed as sliding-window or linear are
  * treated as full attention, which errs on the side of more memory.
  */
-export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo): ModelSpec {
+export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, files: HubFile[] = []): ModelSpec {
   // Multimodal checkpoints keep the language model's numbers in text_config.
   const config = positive(rawConfig.num_hidden_layers)
     ? rawConfig
@@ -25,7 +41,8 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo): Mo
   const heads = positive(config.num_attention_heads) ?? positive(config.n_head);
   const hidden = positive(config.hidden_size) ?? positive(config.n_embd);
   if (!layers || !heads) throw new Error('config.json does not list layers and attention heads.');
-  const headDim = positive(config.head_dim) ?? (hidden ? hidden / heads : undefined);
+  const mlaKeyDim = (positive(config.qk_nope_head_dim) ?? 0) + (positive(config.qk_rope_head_dim) ?? 0);
+  const headDim = positive(config.head_dim) ?? (mlaKeyDim || undefined) ?? (hidden ? hidden / heads : undefined);
   if (!headDim) throw new Error('config.json does not list head_dim or hidden_size.');
   const params = positive(info.safetensors?.total);
   if (!params) throw new Error('The model files do not report a parameter count.');
@@ -40,24 +57,61 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo): Mo
     headDim,
   };
 
+  const experts = positive(config.n_routed_experts) ?? positive(config.num_experts) ?? positive(config.num_local_experts);
+  if (experts) spec.experts = experts;
+  const publishedBytes = publishedWeightBytes(files);
+  if (publishedBytes) spec.publishedBytes = publishedBytes;
   const quantMethod = (config.quantization_config as HubConfig | undefined)?.quant_method;
   if (typeof quantMethod === 'string') spec.quantMethod = quantMethod;
 
   // DeepSeek-style MLA caches one compressed latent plus the rotary part of the key.
   const kvLoraRank = positive(config.kv_lora_rank);
   if (kvLoraRank) spec.mlaDim = kvLoraRank + (positive(config.qk_rope_head_dim) ?? 0);
+  const vHeadDim = positive(config.v_head_dim);
+  if (!kvLoraRank && vHeadDim && vHeadDim !== headDim) spec.vHeadDim = vHeadDim;
 
+  // Gemma 4 gives its global layers their own cache shape, with keys doubling as values.
+  const globalHeads = positive(config.num_global_key_value_heads);
+  const globalHeadDim = positive(config.global_head_dim);
+  if (!kvLoraRank && (globalHeads || globalHeadDim)) {
+    spec.slidingKvHeads = spec.kvHeads;
+    spec.slidingHeadDim = spec.headDim;
+    spec.kvHeads = globalHeads ?? spec.kvHeads;
+    spec.headDim = globalHeadDim ?? spec.headDim;
+    if (config.attention_k_eq_v === true) spec.vHeadDim = 0;
+  }
+  // MiMo V2 describes its sliding-window layers with swa_* fields.
+  const swaHeads = positive(config.swa_num_key_value_heads);
+  if (!kvLoraRank && swaHeads) {
+    spec.slidingKvHeads = swaHeads;
+    spec.slidingHeadDim = positive(config.swa_head_dim) ?? spec.headDim;
+    const swaVHeadDim = positive(config.swa_v_head_dim);
+    if (swaVHeadDim && swaVHeadDim !== spec.slidingHeadDim) spec.slidingVHeadDim = swaVHeadDim;
+  }
+
+  // Hybrid models name their layer kinds in one of three ways: layer_types (most), a 0/1
+  // hybrid_layer_pattern with 1 for sliding-window layers (MiMo V2), or linear_attn_config's
+  // list of linear layers (Kimi).
   const layerTypes = Array.isArray(config.layer_types) ? config.layer_types : [];
+  const pattern = Array.isArray(config.hybrid_layer_pattern) ? config.hybrid_layer_pattern : [];
+  const linearConfig = (config.linear_attn_config as HubConfig | undefined) ?? {};
+  const kdaLayers = Array.isArray(linearConfig.kda_layers) ? linearConfig.kda_layers.length : 0;
   const window = positive(config.sliding_window);
-  const slidingLayers = layerTypes.filter((type) => type === 'sliding_attention').length;
+  const slidingLayers = layerTypes.length
+    ? layerTypes.filter((type) => type === 'sliding_attention').length
+    : pattern.filter((kind) => kind === 1).length;
   if (slidingLayers && window) {
     spec.slidingLayers = slidingLayers;
     spec.slidingWindow = window;
   }
-  const stateLayers = layerTypes.filter(
-    (type) => typeof type === 'string' && /linear|mamba|recurrent/.test(type),
-  ).length;
+  const stateLayers = layerTypes.length
+    ? layerTypes.filter((type) => typeof type === 'string' && /linear|mamba|recurrent/.test(type)).length
+    : kdaLayers;
   if (stateLayers) spec.stateLayers = stateLayers;
+  if (config.kv_source_layer_ids || config.compress_ratios) {
+    spec.kvNote =
+      'This model shares and compresses its KV cache across layers, which the calculator does not model, so the KV cache figure is an upper bound.';
+  }
 
   const maxContext = positive(config.max_position_embeddings);
   if (maxContext) spec.maxContext = maxContext;
@@ -79,9 +133,10 @@ export async function loadFromHub(input: string): Promise<ModelSpec> {
   const id = parseModelId(input);
   if (!id) throw new Error('Enter a model id like Qwen/Qwen3-8B.');
 
-  const [infoRes, configRes] = await Promise.all([
+  const [infoRes, configRes, filesRes] = await Promise.all([
     fetch(`${HUB}/api/models/${id}?expand[]=safetensors`),
     fetch(`${HUB}/${id}/resolve/main/config.json`),
+    fetch(`${HUB}/api/models/${id}/tree/main`),
   ]);
   // The Hub answers 401, not 404, for ids that do not exist, so private repos stay hidden.
   if (infoRes.status === 404 || infoRes.status === 401) {
@@ -93,5 +148,7 @@ export async function loadFromHub(input: string): Promise<ModelSpec> {
   }
   if (!configRes.ok) throw new Error(`${id} has no readable config.json (${configRes.status}).`);
 
-  return specFromHub(id, await configRes.json(), await infoRes.json());
+  // The file listing only sharpens "as published"; the estimate works without it.
+  const files: HubFile[] = filesRes.ok ? await filesRes.json().catch(() => []) : [];
+  return specFromHub(id, await configRes.json(), await infoRes.json(), Array.isArray(files) ? files : []);
 }

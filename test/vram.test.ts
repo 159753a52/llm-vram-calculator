@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESETS } from '../src/presets.ts';
-import { parseModelId, specFromHub } from '../src/hf.ts';
+import { parseModelId, publishedWeightBytes, specFromHub } from '../src/hf.ts';
 import {
   GIB,
   WEIGHT_PRECISIONS,
@@ -9,6 +9,7 @@ import {
   formatGib,
   gpusNeeded,
   kvCacheBytes,
+  kvGrowthPerToken,
   weightBytes,
   type Precision,
 } from '../src/vram.ts';
@@ -125,6 +126,118 @@ test('specFromHub picks up MLA, sliding windows, MXFP4 and nested text configs',
   assert.deepEqual([vision.layers, vision.kvHeads, vision.headDim], [10, 8, 128]);
 
   assert.throws(() => specFromHub('x/empty', {}, info), /layers and attention heads/);
+});
+
+test('"As published" uses the real file size when the repository listing is known', () => {
+  const files = [
+    { type: 'file', path: 'model_pp0_ep0_shard0.safetensors', lfs: { size: 1_000 } },
+    { type: 'file', path: 'model_mtp.safetensors', lfs: { size: 200 } },
+    { type: 'file', path: 'consolidated-00001-of-00001.safetensors', lfs: { size: 1_150 } },
+    { type: 'file', path: 'dflash/model.safetensors', lfs: { size: 300 } },
+    { type: 'file', path: 'config.json', size: 5 },
+  ];
+  assert.equal(publishedWeightBytes(files), 1_200);
+  assert.equal(publishedWeightBytes([{ type: 'file', path: 'README.md', size: 10 }]), undefined);
+
+  // MiMo V2.6 Flash stores FP4 experts in U8 tensors while its quant_method says fp8.
+  const mimo = specFromHub(
+    'XiaomiMiMo/MiMo-V2.6-Flash-RL',
+    { num_hidden_layers: 48, num_attention_heads: 64, num_key_value_heads: 4, head_dim: 192 },
+    { safetensors: { total: 310_756_322_688, parameters: { U8: 302_795_194_368 } } },
+    [{ type: 'file', path: 'model_pp0_ep0_shard0.safetensors', lfs: { size: 172_932_505_264 } }],
+  );
+  assert.equal(weightBytes(mimo, precision('native')), 172_932_505_264);
+  assert.equal(weightBytes(mimo, precision('bf16')), 310_756_322_688 * 2);
+});
+
+test('keys and values of different widths: MiMo V2 caches 4 × (192 + 128) values per layer', () => {
+  const spec = { ...preset('Qwen/Qwen3-8B'), layers: 1, kvHeads: 4, headDim: 192, vHeadDim: 128 };
+  assert.equal(kvCacheBytes(spec, 1, 1, 16), 4 * (192 + 128) * 2);
+});
+
+test('Gemma 4: global layers cache 4 × 512 keys that double as values, sliding layers 16 × 256', () => {
+  const gemma = specFromHub(
+    'google/gemma-4-31B-it',
+    {
+      text_config: {
+        num_hidden_layers: 60,
+        num_attention_heads: 32,
+        num_key_value_heads: 16,
+        head_dim: 256,
+        num_global_key_value_heads: 4,
+        global_head_dim: 512,
+        attention_k_eq_v: true,
+        sliding_window: 1024,
+        layer_types: [...Array(50).fill('sliding_attention'), ...Array(10).fill('full_attention')],
+      },
+    },
+    { safetensors: { total: 31_273_088_876 } },
+  );
+  assert.deepEqual(
+    [gemma.kvHeads, gemma.headDim, gemma.vHeadDim, gemma.slidingKvHeads, gemma.slidingHeadDim],
+    [4, 512, 0, 16, 256],
+  );
+  // 262K tokens: 10 global layers × 2,048 values per token, plus 50 sliding layers × 1,024 tokens × 8,192.
+  assert.equal(kvCacheBytes(gemma, 262_144, 1, 16), (10 * 262_144 * 2_048 + 50 * 1_024 * 8_192) * 2);
+  // Past the window only the global layers grow: 40 KB per token.
+  assert.equal(kvGrowthPerToken(gemma, 16), 10 * 2_048 * 2);
+});
+
+test('specFromHub reads the hybrid layouts of MiMo, Kimi and DeepSeek V4', () => {
+  const info = { safetensors: { total: 1e9 } };
+  const mimo = specFromHub(
+    'x/mimo',
+    {
+      num_hidden_layers: 6,
+      num_attention_heads: 64,
+      num_key_value_heads: 4,
+      head_dim: 192,
+      v_head_dim: 128,
+      sliding_window: 128,
+      hybrid_layer_pattern: [0, 1, 1, 1, 1, 0],
+      swa_num_key_value_heads: 8,
+      swa_head_dim: 192,
+      swa_v_head_dim: 128,
+    },
+    info,
+  );
+  assert.deepEqual([mimo.slidingLayers, mimo.slidingWindow, mimo.vHeadDim], [4, 128, 128]);
+  assert.deepEqual([mimo.slidingKvHeads, mimo.slidingHeadDim, mimo.slidingVHeadDim], [8, 192, 128]);
+  // 1,000 tokens: 2 global layers × 1,000 × 4 × 320 values, 4 sliding layers × 128 × 8 × 320.
+  assert.equal(kvCacheBytes(mimo, 1_000, 1, 16), (2 * 1_000 * 1_280 + 4 * 128 * 2_560) * 2);
+
+  const kimi = specFromHub(
+    'x/kimi',
+    {
+      num_hidden_layers: 8,
+      hidden_size: 7168,
+      num_attention_heads: 96,
+      kv_lora_rank: 512,
+      qk_nope_head_dim: 128,
+      qk_rope_head_dim: 64,
+      v_head_dim: 128,
+      linear_attn_config: { kda_layers: [1, 2, 3, 5, 6, 7], full_attn_layers: [4, 8] },
+    },
+    info,
+  );
+  assert.deepEqual([kimi.mlaDim, kimi.headDim, kimi.stateLayers, kimi.vHeadDim], [576, 192, 6, undefined]);
+
+  const deepseek = specFromHub(
+    'x/dsv4',
+    { num_hidden_layers: 40, num_attention_heads: 64, num_key_value_heads: 1, head_dim: 512, kv_source_layer_ids: [2, 8] },
+    info,
+  );
+  assert.match(deepseek.kvNote ?? '', /upper bound/);
+  assert.equal(specFromHub('x/plain', { num_hidden_layers: 2, num_attention_heads: 2, head_dim: 64 }, info).kvNote, undefined);
+});
+
+test('the presets behind the FAQ: linear layers in Qwen3.8 27B and Kimi K3', () => {
+  assert.deepEqual([preset('Qwen/Qwen3.8-27B').stateLayers, preset('Qwen/Qwen3.8-27B').layers], [48, 64]);
+  assert.deepEqual([preset('moonshotai/Kimi-K3').stateLayers, preset('moonshotai/Kimi-K3').layers], [69, 93]);
+  assert.equal(preset('zai-org/GLM-5.3').mlaDim, 576);
+  const gemma = preset('google/gemma-4-31B-it');
+  assert.deepEqual([gemma.slidingLayers, gemma.layers, gemma.slidingWindow, gemma.kvHeads, gemma.headDim], [50, 60, 1024, 4, 512]);
+  assert.match(preset('deepseek-ai/DeepSeek-V4.1-Flash').kvNote ?? '', /upper bound/);
 });
 
 test('parseModelId accepts ids and Hub URLs only', () => {

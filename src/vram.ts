@@ -13,19 +13,40 @@ export type ModelSpec = {
   params: number;
   /** Parameter counts by stored dtype (safetensors metadata), used for "as published". */
   dtypes?: Record<string, number>;
+  /** Routed experts of a mixture-of-experts model; all of them sit in memory. */
+  experts?: number;
   /** quantization_config.quant_method, e.g. "mxfp4" or "fp8". */
   quantMethod?: string;
+  /**
+   * Bytes of the published weight files. When known, "as published" uses it, which stays exact
+   * for storage formats the dtype table cannot describe (DeepSeek V4 keeps FP4 experts in I8).
+   */
+  publishedBytes?: number;
   layers: number;
   kvHeads: number;
   headDim: number;
+  /**
+   * Value head size when it differs from the key's (MiMo V2 caches 192-wide keys, 128-wide
+   * values). 0 means the values are the keys, cached once (Gemma 4's global layers).
+   */
+  vHeadDim?: number;
   /** Multi-head latent attention (DeepSeek V2/V3): values cached per token per layer. */
   mlaDim?: number;
   /** Layers that keep only the last `slidingWindow` tokens. */
   slidingLayers?: number;
   slidingWindow?: number;
+  /**
+   * Cache shape of the sliding-window layers when it differs from the full-attention layers,
+   * which `kvHeads` and `headDim` describe (Gemma 4: 16 × 256 sliding, 4 × 512 global).
+   */
+  slidingKvHeads?: number;
+  slidingHeadDim?: number;
+  slidingVHeadDim?: number;
   /** Layers with a fixed-size state instead of a KV cache (linear attention, Mamba). */
   stateLayers?: number;
   maxContext?: number;
+  /** Shown next to the result when the cache is known to be smaller than modelled here. */
+  kvNote?: string;
 };
 
 export type Precision = { id: string; label: string; bits: number };
@@ -70,6 +91,7 @@ const DTYPE_BITS: Record<string, number> = {
 /** Bytes to hold the weights. MXFP4 checkpoints store 4.25-bit weights in tensors typed U8. */
 export function weightBytes(spec: ModelSpec, precision: Precision): number {
   if (precision.id !== 'native') return (spec.params * precision.bits) / 8;
+  if (spec.publishedBytes) return spec.publishedBytes;
   if (!spec.dtypes) return spec.params * 2;
   let bits = 0;
   for (const [dtype, count] of Object.entries(spec.dtypes)) {
@@ -81,7 +103,14 @@ export function weightBytes(spec: ModelSpec, precision: Precision): number {
 
 /** Values cached per token in one attention layer: K and V, or MLA's compressed latent. */
 export function kvValuesPerTokenPerLayer(spec: ModelSpec): number {
-  return spec.mlaDim ?? 2 * spec.kvHeads * spec.headDim;
+  return spec.mlaDim ?? spec.kvHeads * (spec.headDim + (spec.vHeadDim ?? spec.headDim));
+}
+
+/** Values one sliding-window layer caches per token. */
+export function slidingValuesPerTokenPerLayer(spec: ModelSpec): number {
+  if (spec.slidingKvHeads === undefined && spec.slidingHeadDim === undefined) return kvValuesPerTokenPerLayer(spec);
+  const headDim = spec.slidingHeadDim ?? spec.headDim;
+  return (spec.slidingKvHeads ?? spec.kvHeads) * (headDim + (spec.slidingVHeadDim ?? headDim));
 }
 
 /** KV cache for `requests` sequences of `context` tokens each. */
@@ -90,8 +119,16 @@ export function kvCacheBytes(spec: ModelSpec, context: number, requests: number,
   const sliding = Math.min(spec.slidingLayers ?? 0, attentionLayers);
   const full = attentionLayers - sliding;
   const slidingTokens = Math.min(context, spec.slidingWindow ?? context);
-  const cachedTokens = full * context + sliding * slidingTokens;
-  return (requests * cachedTokens * kvValuesPerTokenPerLayer(spec) * kvBits) / 8;
+  const values =
+    full * context * kvValuesPerTokenPerLayer(spec) + sliding * slidingTokens * slidingValuesPerTokenPerLayer(spec);
+  return (requests * values * kvBits) / 8;
+}
+
+/** Cache added by each extra token of one request once every sliding window is full. */
+export function kvGrowthPerToken(spec: ModelSpec, kvBits: number): number {
+  const attentionLayers = Math.max(0, spec.layers - (spec.stateLayers ?? 0));
+  const full = attentionLayers - Math.min(spec.slidingLayers ?? 0, attentionLayers);
+  return (full * kvValuesPerTokenPerLayer(spec) * kvBits) / 8;
 }
 
 /** Memory every GPU needs no matter how small the model: the CUDA context and allocator pools. */
@@ -102,7 +139,7 @@ export type Estimate = {
   kvCache: number;
   overhead: number;
   total: number;
-  /** KV cache per token of context for a single request. */
+  /** How much the cache of one request grows per token once the sliding windows are full. */
   kvPerToken: number;
 };
 
@@ -126,7 +163,7 @@ export function estimate(
     kvCache,
     overhead,
     total: weights + kvCache + overhead,
-    kvPerToken: kvCacheBytes(spec, 1, 1, kvBits),
+    kvPerToken: kvGrowthPerToken(spec, kvBits),
   };
 }
 
