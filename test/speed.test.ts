@@ -61,7 +61,7 @@ test('the FAQ numbers', () => {
   const dense = tokensPerSecond(llama, precision('q4_k_m'), 512, 16, gpu('RTX 4090'));
   assert.ok(moe.low > dense.low, 'Qwen3-30B-A3B should write faster than Llama 3.1 8B');
   assert.deepEqual(
-    ['Mac, M4 Max 128 GB', 'Mac Studio, M3 Ultra 512 GB', 'Ryzen AI Max+ 395, 128 GB'].map((name) => gpu(name).bandwidth),
+    ['M4 Max Mac (128 GB)', 'M3 Ultra Mac Studio (512 GB)', 'Ryzen AI Max+ 395 (128 GB)'].map((name) => gpu(name).bandwidth),
     [546, 819, 256],
   );
 });
