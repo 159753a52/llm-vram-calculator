@@ -80,7 +80,12 @@ export const WEIGHT_PRECISIONS: Precision[] = [
   { id: 'q6_k', label: 'GGUF Q6_K', bits: 6.56 },
   { id: 'q5_k_m', label: 'GGUF Q5_K_M', bits: 5.67 },
   { id: 'q4_k_m', label: 'GGUF Q4_K_M', bits: 4.84 },
+  // The IQ types are medians of public uploads (unsloth, bartowski, mradermacher) of Llama 3.1 8B,
+  // Qwen3 30B-A3B, Qwen3.6 27B, Qwen3.8 27B and Gemma 4 31B, checked 2026-09-27. Uploaders mix
+  // tensor types differently, so one file can be 5-10% off; its download size is the exact figure.
+  { id: 'iq4_xs', label: 'GGUF IQ4_XS', bits: 4.35 },
   { id: 'q3_k_m', label: 'GGUF Q3_K_M', bits: 3.91 },
+  { id: 'iq3_xxs', label: 'GGUF IQ3_XXS', bits: 3.3 },
   { id: 'q2_k', label: 'GGUF Q2_K', bits: 3.35 },
 ];
 

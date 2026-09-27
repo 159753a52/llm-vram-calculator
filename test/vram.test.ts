@@ -39,6 +39,24 @@ test('fixed precisions scale the parameter count', () => {
   assert.equal(weightBytes(llama, precision('q4_k_m')), (8_030_261_248 * 4.84) / 8);
 });
 
+test('IQ4_XS and IQ3_XXS stay within 10% of real GGUF downloads', () => {
+  // unsloth file sizes on Hugging Face, 2026-09-27.
+  const files: [string, string, number][] = [
+    ['meta-llama/Llama-3.1-8B-Instruct', 'iq4_xs', 4.158],
+    ['meta-llama/Llama-3.1-8B-Instruct', 'iq3_xxs', 3.094],
+    ['Qwen/Qwen3-30B-A3B', 'iq4_xs', 15.253],
+    ['Qwen/Qwen3-30B-A3B', 'iq3_xxs', 12.003],
+    ['Qwen/Qwen3.6-27B', 'iq4_xs', 14.38],
+    ['Qwen/Qwen3.6-27B', 'iq3_xxs', 11.171],
+    ['Qwen/Qwen3.8-27B', 'iq4_xs', 13.27],
+    ['Qwen/Qwen3.8-27B', 'iq3_xxs', 10.18],
+  ];
+  for (const [id, type, gib] of files) close(weightBytes(preset(id), precision(type)) / GIB, gib, 0.1);
+  // Each sits between its neighbours, so the dropdown stays ordered by size.
+  const bits = (id: string) => precision(id).bits;
+  assert.ok(bits('q4_k_m') > bits('iq4_xs') && bits('iq4_xs') > bits('q3_k_m') && bits('q3_k_m') > bits('iq3_xxs'));
+});
+
 test('MoE models load every expert', () => {
   const moe = preset('Qwen/Qwen3-30B-A3B');
   assert.equal(weightBytes(moe, precision('bf16')), 30_532_122_624 * 2);
