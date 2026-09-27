@@ -3,7 +3,7 @@
 Estimate how much GPU memory a large language model needs for inference (weights, KV cache and runtime
 overhead) for any model on Hugging Face.
 
-**Use it online: https://toolsite-static.pages.dev/llm-vram-calculator/**
+**Use it online: https://modelvram.com/llm-vram-calculator/**
 
 This repository holds the calculation core behind that page: dependency-free TypeScript, plus tests that pin
 it to real checkpoint sizes.
@@ -37,8 +37,8 @@ dtypes, which gives 12.82 GB for gpt-oss-20b and 641.3 GB for DeepSeek V3.
 (GB means GiB throughout, the unit GPU memory is sold in.)
 
 The site has a page per model with every quantization, the cache at long context and the GPUs that fit,
-for example [Gemma 4 31B](https://toolsite-static.pages.dev/llm-vram-calculator/gemma-4-31b-it/) and
-[DeepSeek V4.1 Flash](https://toolsite-static.pages.dev/llm-vram-calculator/deepseek-v4.1-flash/).
+for example [Gemma 4 31B](https://modelvram.com/llm-vram-calculator/gemma-4-31b-it/) and
+[DeepSeek V4.1 Flash](https://modelvram.com/llm-vram-calculator/deepseek-v4.1-flash/).
 
 ## The formula
 
@@ -113,7 +113,7 @@ appreciated.
 weights and the whole KV cache once, so the ceiling is memory bandwidth divided by those bytes. Engines reach
 55–75% of it with dense models and 30–50% with mixture-of-experts models, plus 0.5–1.5 ms of fixed cost per
 token, and 0.8–2 ms more when cards in tensor parallel exchange results after every layer. That puts Llama 3.1 8B at Q4_K_M on an RTX 4090 at 96–143 tokens/s (about 130 measured) and
-Qwen3-30B-A3B at 121–219 (about 170 measured), with a 512-token context. Online: https://toolsite-static.pages.dev/llm-speed-calculator/
+Qwen3-30B-A3B at 121–219 (about 170 measured), with a 512-token context. Online: https://modelvram.com/llm-speed-calculator/
 
 ## Use it as a library
 
