@@ -1,9 +1,26 @@
 import type { ModelSpec } from './vram.ts';
 
 // Numbers come from each model's config.json, safetensors metadata and file sizes on Hugging
-// Face (checked 2026-09-26); `npm run model-spec -- <id>` prints them for a new model. Any other
+// Face (mostly checked 2026-09-26; later additions carry checked); `npm run model-spec -- <id>` prints them for a new model. Any other
 // model can be loaded from the Hub with loadFromHub().
 export const PRESETS: ModelSpec[] = [
+  {
+    id: 'yandex/AliceAI-Foundation-80B-A3B-Base',
+    name: 'AliceAI Foundation 80B-A3B (MoE)',
+    params: 81_286_433_408,
+    dtypes: { BF16: 81_286_433_408 },
+    layers: 48,
+    kvHeads: 2,
+    headDim: 256,
+    experts: 512,
+    publishedBytes: 162_573_021_056,
+    stateLayers: 36,
+    stateKind: 'KDA recurrent',
+    maxContext: 262_144,
+    activeParams: 3_000_000_000,
+    checked: '2026-09-27',
+    kvNote: 'The 36 KDA layers keep a fixed recurrent state, which this estimate does not include; only the 12 gated-attention layers add a context-growing KV cache. Real serving memory may be higher.',
+  },
   {
     id: 'deepseek-ai/DeepSeek-V4-Flash-0731',
     name: 'DeepSeek V4 Flash 0731',

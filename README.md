@@ -25,6 +25,7 @@ So new models work the day they are uploaded, and newer architectures come out r
 | Sliding-window layers | Layers listed as `sliding_attention` in `layer_types`, or marked 1 in MiMo's `hybrid_layer_pattern`, cache only the window (gpt-oss: 128 tokens on half of its layers). |
 | Different cache shapes per layer kind | Gemma 4's global layers cache 4 heads of 512 values that serve as both keys and values, its sliding layers 16 heads of 256; MiMo V2 caches 192-wide keys and 128-wide values. |
 | Linear-attention and state-space layers | No KV cache that grows with context: 48 of Qwen3.8 27B's 64 layers, 69 of Kimi K3's 93 (from `linear_attn_config`). |
+| KDA recurrent layers (AliceAI Foundation 80B-A3B) | 36 of 48 layers keep a fixed state rather than a context-growing KV cache. The estimate excludes that fixed state, so real serving memory can be higher. |
 | Sparse-attention indexer (DeepSeek V3.2, GLM-5) | The indexer keeps its own FP8 key per token (`index_head_dim`, 128 values), in every layer or, for GLM-5, only in the layers listed as `full` in `indexer_types`. |
 | Hybrid layouts named other ways | `full_attention_interval` (Qwen3-Next: one full-attention layer in four) and Nemotron-H's `hybrid_override_pattern` (only `*` layers are attention). |
 | Layers that reuse an earlier cache (Gemma 4 E models) | `num_kv_shared_layers`: the last layers keep no cache of their own, 18 of Gemma 4 E4B's 42. |
@@ -63,6 +64,7 @@ default overhead; `npm run export-data` regenerates them. Totals in GiB:
 
 | Model | Parameters | As published | Q8_0 | Q4_K_M | Q4_K_M at max context | KV cache per token (FP16) |
 |---|---|---|---|---|---|---|
+| AliceAI Foundation 80B-A3B (MoE) | 81.3B | 167 | 89.2 | 51.1 | 57.5 (256K) | 24 KiB |
 | DeepSeek V4 Flash 0731 | 304.2B | 172 | 332 | 190 | 284 (1M) | 86 KiB |
 | Qwen3.6 35B-A3B (MoE) | 36.0B | 74.3 | 39.8 | 22.9 | 28.3 (256K) | 20 KiB |
 | Qwen3.6 27B | 27.8B | 58.0 | 31.3 | 18.3 | 35.3 (256K) | 64 KiB |

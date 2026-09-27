@@ -61,6 +61,8 @@ export type ModelSpec = {
   /** Layers that reuse an earlier layer's cache instead of keeping their own (Gemma 4 E models). */
   sharedKvLayers?: number;
   maxContext?: number;
+  /** Date the model's public files were checked, when newer than the preset snapshot. */
+  checked?: string;
   /** Shown next to the result when the cache is known to be smaller than modelled here. */
   kvNote?: string;
 };

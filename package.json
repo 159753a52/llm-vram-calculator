@@ -22,7 +22,7 @@
     "quantization",
     "calculator"
   ],
-  "homepage": "https://toolsite-static.pages.dev/llm-vram-calculator/",
+  "homepage": "https://modelvram.com/llm-vram-calculator/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/159753a52/llm-vram-calculator.git"
