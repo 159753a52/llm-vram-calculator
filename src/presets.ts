@@ -2,8 +2,34 @@ import type { ModelSpec } from './vram.ts';
 
 // Numbers come from each model's config.json, safetensors metadata and file sizes on Hugging
 // Face (mostly checked 2026-09-26; later additions carry checked); `npm run model-spec -- <id>` prints them for a new model. Any other
-// model can be loaded from the Hub with loadFromHub().
+// model can be loaded from the Hub in the tool itself.
 export const PRESETS: ModelSpec[] = [
+  {
+    id: 'ornith-ai/Ornith-1.5-35B-A3B',
+    name: 'Ornith 1.5 35B-A3B (MoE)',
+    params: 35_951_822_704,
+    dtypes: { BF16: 35_951_822_704 },
+    layers: 40,
+    kvHeads: 2,
+    headDim: 256,
+    experts: 256,
+    publishedBytes: 71_903_871_064,
+    stateLayers: 30,
+    maxContext: 262_144,
+    activeParams: 3_000_000_000,
+  },
+  {
+    id: 'ornith-ai/Ornith-1.5-9B',
+    name: 'Ornith 1.5 9B',
+    params: 9_653_104_368,
+    dtypes: { BF16: 9_653_104_368 },
+    layers: 32,
+    kvHeads: 4,
+    headDim: 256,
+    publishedBytes: 19_306_303_864,
+    stateLayers: 24,
+    maxContext: 262_144,
+  },
   {
     id: 'yandex/AliceAI-Foundation-80B-A3B-Base',
     name: 'AliceAI Foundation 80B-A3B (MoE)',
