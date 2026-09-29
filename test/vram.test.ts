@@ -10,6 +10,7 @@ import {
   gpusNeeded,
   kvCacheBytes,
   kvGrowthPerToken,
+  slidingCells,
   weightBytes,
   type Precision,
 } from '../src/vram.ts';
@@ -66,11 +67,29 @@ test('MLA caches the compressed latent: DeepSeek V3 needs 70,272 bytes per token
   assert.equal(kvCacheBytes(preset('deepseek-ai/DeepSeek-V3'), 1, 1, 16), 61 * 576 * 2);
 });
 
-test('sliding-window layers stop growing at the window', () => {
+test('sliding-window layers stop growing at window + ubatch, padded to 256 (llama-kv-cache-iswa.cpp)', () => {
   const gpt = preset('openai/gpt-oss-20b');
   const perLayerToken = 2 * 8 * 64 * 2;
   assert.equal(kvCacheBytes(gpt, 100, 1, 16), 24 * 100 * perLayerToken);
-  assert.equal(kvCacheBytes(gpt, 1000, 1, 16), (12 * 1000 + 12 * 128) * perLayerToken);
+  // 128-token window + 512 = 640, padded to 768 cells.
+  assert.equal(kvCacheBytes(gpt, 1000, 1, 16), (12 * 1000 + 12 * 768) * perLayerToken);
+  assert.equal(kvCacheBytes(gpt, 700, 1, 16), 24 * 700 * perLayerToken);
+  assert.deepEqual([slidingCells(128, 32_768), slidingCells(1024, 4096), slidingCells(4096, 3072)], [768, 1536, 3072]);
+  // One unified cache for 4 slots: 4 × 1,024 + 512 = 4,608 cells, not 4 × 1,536.
+  assert.equal(slidingCells(1024, 62_080, 4), 4608);
+});
+
+// Byte counts llama.cpp printed for its KV buffers (modelvram.com/accuracy/).
+test('kvCacheBytes reproduces llama.cpp KV buffer logs to the byte', () => {
+  const MIB = 1024 ** 2;
+  // ollama#16617: Gemma 4 12B, q8_0, 4,096 cells: non-SWA 34.00 MiB + SWA 255.00 MiB (1,536 cells).
+  assert.equal(kvCacheBytes(preset('google/gemma-4-12B-it'), 4096, 1, 8.5), (34 + 255) * MIB);
+  // llama.cpp#21414: Gemma 4 26B-A4B, f16, 4 slots × 62,080 = 248,320 cells: 4850.00 + 900.00 MiB (4,608 cells).
+  assert.equal(kvCacheBytes(preset('google/gemma-4-26B-A4B-it'), 62_080, 4, 16), (4850 + 900) * MIB);
+  // llama.cpp#15789: gpt-oss-20b, f16, 32,768 cells: 768.00 MiB + SWA 18.00 MiB (768 cells).
+  assert.equal(kvCacheBytes(preset('openai/gpt-oss-20b'), 32_768, 1, 16), (768 + 18) * MIB);
+  // llama.cpp#18466: Llama 3.1 8B, f16, 132,096 cells: 16512.00 MiB.
+  assert.equal(kvCacheBytes(preset('meta-llama/Llama-3.1-8B-Instruct'), 132_096, 1, 16), 16_512 * MIB);
 });
 
 test('Limite caches 12 full layers and 36 inclusive sliding windows', () => {
@@ -84,7 +103,8 @@ test('Limite caches 12 full layers and 36 inclusive sliding windows', () => {
     { safetensors: { total: 1_035_253_888 } },
   );
   assert.deepEqual([spec.slidingLayers, spec.slidingWindow], [36, 1025]);
-  assert.equal(kvCacheBytes(spec, 131_072, 1, 16), (12 * 131_072 + 36 * 1025) * 2 * 2 * 128 * 2);
+  // 1,025 + 512 = 1,537 cells, padded to 1,792.
+  assert.equal(kvCacheBytes(spec, 131_072, 1, 16), (12 * 131_072 + 36 * 1792) * 2 * 2 * 128 * 2);
 });
 
 test('linear-attention layers keep no KV cache', () => {
@@ -187,7 +207,7 @@ test('keys and values of different widths: MiMo V2 caches 4 × (192 + 128) value
   assert.equal(kvCacheBytes(spec, 1, 1, 16), 4 * (192 + 128) * 2);
 });
 
-test('Gemma 4: global layers cache 4 × 512 keys that double as values, sliding layers 16 × 256', () => {
+test('Gemma 4: global layers cache 4 × 512 keys and, separately, 4 × 512 values; sliding layers 16 × 256', () => {
   const gemma = specFromHub(
     'google/gemma-4-31B-it',
     {
@@ -206,13 +226,15 @@ test('Gemma 4: global layers cache 4 × 512 keys that double as values, sliding 
     { safetensors: { total: 31_273_088_876 } },
   );
   assert.deepEqual(
-    [gemma.kvHeads, gemma.headDim, gemma.vHeadDim, gemma.slidingKvHeads, gemma.slidingHeadDim],
-    [4, 512, 0, 16, 256],
+    [gemma.kvHeads, gemma.headDim, gemma.vHeadDim, gemma.kEqV, gemma.slidingKvHeads, gemma.slidingHeadDim],
+    [4, 512, undefined, true, 16, 256],
   );
-  // 262K tokens: 10 global layers × 2,048 values per token, plus 50 sliding layers × 1,024 tokens × 8,192.
-  assert.equal(kvCacheBytes(gemma, 262_144, 1, 16), (10 * 262_144 * 2_048 + 50 * 1_024 * 8_192) * 2);
-  // Past the window only the global layers grow: 40 KB per token.
-  assert.equal(kvGrowthPerToken(gemma, 16), 10 * 2_048 * 2);
+  // attention_k_eq_v shares the projection, not the cache: llama.cpp ropes K and rms-norms V
+  // (src/models/gemma4.cpp) and allocates both. 262K tokens: 10 global layers × 4,096 values per
+  // token, plus 50 sliding layers × 1,536 cells (1,024 window + 512 ubatch) × 8,192.
+  assert.equal(kvCacheBytes(gemma, 262_144, 1, 16), (10 * 262_144 * 4_096 + 50 * 1_536 * 8_192) * 2);
+  // Past the window only the global layers grow: 80 KB per token.
+  assert.equal(kvGrowthPerToken(gemma, 16), 10 * 4_096 * 2);
 });
 
 test('specFromHub reads the hybrid layouts of MiMo, Kimi and DeepSeek V4', () => {
@@ -235,8 +257,8 @@ test('specFromHub reads the hybrid layouts of MiMo, Kimi and DeepSeek V4', () =>
   );
   assert.deepEqual([mimo.slidingLayers, mimo.slidingWindow, mimo.vHeadDim], [4, 128, 128]);
   assert.deepEqual([mimo.slidingKvHeads, mimo.slidingHeadDim, mimo.slidingVHeadDim], [8, 192, 128]);
-  // 1,000 tokens: 2 global layers × 1,000 × 4 × 320 values, 4 sliding layers × 128 × 8 × 320.
-  assert.equal(kvCacheBytes(mimo, 1_000, 1, 16), (2 * 1_000 * 1_280 + 4 * 128 * 2_560) * 2);
+  // 1,000 tokens: 2 global layers × 1,000 × 4 × 320 values, 4 sliding layers × 768 cells × 8 × 320.
+  assert.equal(kvCacheBytes(mimo, 1_000, 1, 16), (2 * 1_000 * 1_280 + 4 * 768 * 2_560) * 2);
 
   const kimi = specFromHub(
     'x/kimi',
@@ -308,7 +330,9 @@ test('Gemma 4 E models: the last layers reuse earlier caches and keep none of th
   );
   // Own caches in layers 0-5 only: five sliding layers and one global layer.
   assert.deepEqual([spec.sharedKvLayers, spec.slidingLayers, spec.kvHeads, spec.headDim], [6, 5, 2, 512]);
-  assert.equal(kvCacheBytes(spec, 1_000, 1, 16), (1 * 1_000 * 2 * 1_024 + 5 * 512 * 2 * 512) * 2);
+  // 512 window + 512 ubatch = 1,024 cells, more than the 1,000 tokens, so the sliding layers keep all.
+  assert.equal(kvCacheBytes(spec, 1_000, 1, 16), (1 * 1_000 * 2 * 1_024 + 5 * 1_000 * 2 * 512) * 2);
+  assert.equal(kvCacheBytes(spec, 4_096, 1, 16), (1 * 4_096 * 2 * 1_024 + 5 * 1_024 * 2 * 512) * 2);
 });
 
 test('specFromHub counts attention layers in Qwen3-Next and Nemotron-H layouts', () => {

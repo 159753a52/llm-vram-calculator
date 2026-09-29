@@ -1,0 +1,101 @@
+name: Submit a measurement
+description: Real memory use from llama.cpp, vLLM or another engine, to compare with ModelVRAM's estimate on /accuracy/.
+title: "[measurement] <model> <quant> on <GPU>"
+labels: ["measurement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for measuring. Each submission is checked by hand before it is added to https://modelvram.com/accuracy/.
+        Paste the log lines as printed (no screenshots): the numbers are compared byte for byte with the prediction.
+        Please remove anything private (paths, host names, tokens) from the log before posting.
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: Hugging Face repo of the model, e.g. Qwen/Qwen3.6-35B-A3B
+      placeholder: Qwen/Qwen3.6-35B-A3B
+    validations:
+      required: true
+  - type: input
+    id: file
+    attributes:
+      label: File / quant
+      description: GGUF file name or repo:quant, or the checkpoint and dtype for vLLM (e.g. BF16, FP8)
+      placeholder: unsloth/Qwen3.6-35B-A3B-GGUF, Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Engine and version
+      description: llama.cpp build number or commit (llama-server --version), vLLM version, Ollama version, ...
+      placeholder: llama.cpp b6789 (a1b2c3d)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: GPU / device
+      description: Card(s) or machine and memory; driver or macOS version if you have it
+      placeholder: RTX 4090 24 GB, driver 580.xx
+    validations:
+      required: true
+  - type: input
+    id: context
+    attributes:
+      label: Context (-c / --max-model-len)
+      placeholder: "32768"
+    validations:
+      required: true
+  - type: input
+    id: slots
+    attributes:
+      label: Parallel slots (-np / --max-num-seqs)
+      description: The value the server used; llama-server prints it at start-up (n_slots / n_seq_max)
+      placeholder: "1"
+    validations:
+      required: true
+  - type: dropdown
+    id: kv
+    attributes:
+      label: KV cache type
+      options:
+        - f16 (default)
+        - bf16
+        - q8_0
+        - q4_0
+        - fp8 (vLLM)
+        - other (say which below)
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log lines
+      description: |
+        llama.cpp: the "KV buffer size", "model buffer size" (CPU and GPU), "compute buffer size" lines, plus nvidia-smi (or Activity Monitor) memory with the model loaded.
+        vLLM: the "Model loading took", "Available KV cache memory" and "GPU KV cache size" lines.
+      render: text
+      placeholder: |
+        llama_kv_cache:      CUDA0 KV buffer size =   640.00 MiB
+        load_tensors:        CUDA0 model buffer size = 19234.56 MiB
+    validations:
+      required: true
+  - type: input
+    id: speed
+    attributes:
+      label: Tokens per second (optional)
+      description: Generation speed for one request, and the prompt length it was measured at
+      placeholder: 142 tok/s at 1,000 prompt tokens
+  - type: input
+    id: source
+    attributes:
+      label: Source link (optional)
+      description: If the numbers come from a public post, issue or benchmark, link it
+      placeholder: https://github.com/ggml-org/llama.cpp/discussions/...
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else (optional)
+      description: Flags you passed (-fa, -ub, --n-cpu-moe, -ot ...), other programs on the GPU, anything unusual

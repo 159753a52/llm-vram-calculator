@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How the estimates compare with real runs
+    url: https://modelvram.com/accuracy/
+    about: Published measurements next to ModelVRAM's predictions.

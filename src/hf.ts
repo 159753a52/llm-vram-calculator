@@ -77,7 +77,8 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
   const vHeadDim = positive(config.v_head_dim);
   if (!kvLoraRank && vHeadDim && vHeadDim !== headDim) spec.vHeadDim = vHeadDim;
 
-  // Gemma 4 gives its global layers their own cache shape, with keys doubling as values.
+  // Gemma 4 gives its global layers their own cache shape. With attention_k_eq_v the values come
+  // from the key projection, but llama.cpp still caches them as a separate V (see ModelSpec.kEqV).
   const globalHeads = positive(config.num_global_key_value_heads);
   const globalHeadDim = positive(config.global_head_dim);
   if (!kvLoraRank && (globalHeads || globalHeadDim)) {
@@ -85,7 +86,7 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
     spec.slidingHeadDim = spec.headDim;
     spec.kvHeads = globalHeads ?? spec.kvHeads;
     spec.headDim = globalHeadDim ?? spec.headDim;
-    if (config.attention_k_eq_v === true) spec.vHeadDim = 0;
+    if (config.attention_k_eq_v === true) spec.kEqV = true;
   }
   // MiMo V2 describes its sliding-window layers with swa_* fields.
   const swaHeads = positive(config.swa_num_key_value_heads);

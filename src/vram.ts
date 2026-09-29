@@ -33,9 +33,18 @@ export type ModelSpec = {
   headDim: number;
   /**
    * Value head size when it differs from the key's (MiMo V2 caches 192-wide keys, 128-wide
-   * values). 0 means the values are the keys, cached once (Gemma 4's global layers).
+   * values). Undefined means the same width as the key.
    */
   vHeadDim?: number;
+  /**
+   * The global layers have no value projection: values come from the key projection
+   * (attention_k_eq_v, Gemma 4 12B / 26B / 31B). For display only. llama.cpp still caches K and V
+   * as two tensors, because V skips RoPE and gets its own RMS norm (src/models/gemma4.cpp), and
+   * llama_kv_cache allocates a V tensor of n_embd_v_gqa × kv_size for every layer
+   * (src/llama-kv-cache.cpp). Before 0.1.1 these keys were counted once, which undercounted the
+   * global layers by half.
+   */
+  kEqV?: boolean;
   /** Multi-head latent attention (DeepSeek V2/V3): values cached per token per layer. */
   mlaDim?: number;
   /**
@@ -136,19 +145,41 @@ export function slidingValuesPerTokenPerLayer(spec: ModelSpec): number {
   return (spec.slidingKvHeads ?? spec.kvHeads) * (headDim + (spec.slidingVHeadDim ?? headDim));
 }
 
-/** KV cache for `requests` sequences of `context` tokens each. */
 /** Layers that keep their own KV cache: everything but state layers and cache-sharing layers. */
 const cachingLayers = (spec: ModelSpec) =>
   Math.max(0, spec.layers - (spec.stateLayers ?? 0) - (spec.sharedKvLayers ?? 0));
 
+/** llama.cpp's default --ubatch-size (common/common.h n_ubatch = 512). */
+export const SWA_UBATCH = 512;
+const pad256 = (n: number) => Math.ceil(n / 256) * 256;
+
+/**
+ * Cells llama.cpp gives the sliding-window layers, for `requests` sequences of `context` tokens
+ * sharing one unified cache. src/llama-kv-cache-iswa.cpp:
+ *   size_swa = GGML_PAD(min(size_base, n_swa*(unified ? n_seq_max : 1) + n_ubatch), 256)
+ * The window alone is not enough because a whole ubatch is written before the tokens that slid
+ * out are dropped. We pad first and then cap at the context, which never gives the sliding layers
+ * more cells than the full ones. Examples: 128-token window -> 768 cells (gpt-oss), 1,024 -> 1,536
+ * (Gemma 4), 4 slots x 1,024 -> 4,608.
+ */
+export function slidingCells(window: number, context: number, requests = 1): number {
+  return Math.min(requests * context, pad256(window * requests + SWA_UBATCH));
+}
+
+/**
+ * KV cache for `requests` sequences of `context` tokens each, as llama.cpp allocates it:
+ * full-attention layers keep K and V for every cell, sliding-window layers keep `slidingCells`,
+ * and the DeepSeek sparse-attention indexer adds its FP8 keys.
+ */
 export function kvCacheBytes(spec: ModelSpec, context: number, requests: number, kvBits: number): number {
   const attentionLayers = cachingLayers(spec);
   const sliding = Math.min(spec.slidingLayers ?? 0, attentionLayers);
   const full = attentionLayers - sliding;
-  const slidingTokens = Math.min(context, spec.slidingWindow ?? context);
+  const cells = requests * context;
+  const slidingTokens = spec.slidingWindow ? slidingCells(spec.slidingWindow, context, requests) : cells;
   const values =
-    full * context * kvValuesPerTokenPerLayer(spec) + sliding * slidingTokens * slidingValuesPerTokenPerLayer(spec);
-  return requests * ((values * kvBits) / 8 + context * indexerBytesPerToken(spec));
+    full * cells * kvValuesPerTokenPerLayer(spec) + sliding * slidingTokens * slidingValuesPerTokenPerLayer(spec);
+  return (values * kvBits) / 8 + cells * indexerBytesPerToken(spec);
 }
 
 /** The sparse-attention indexer's own cache, kept in FP8 whatever the KV cache precision. */

@@ -22,8 +22,8 @@ So new models work the day they are uploaded, and newer architectures come out r
 | --- | --- |
 | MoE | Every expert counts toward weight memory: Qwen3-30B-A3B loads 30.5B parameters, not 3B. |
 | MLA (DeepSeek V3, GLM-5.3, Kimi K3) | The cache holds `kv_lora_rank + qk_rope_head_dim` values per token per layer: 576 for DeepSeek V3, about 69 KB per token in BF16. |
-| Sliding-window layers | Layers listed as `sliding_attention` in `layer_types`, or marked 1 in MiMo's `hybrid_layer_pattern`, cache only the window (gpt-oss: 128 tokens on half of its layers). |
-| Different cache shapes per layer kind | Gemma 4's global layers cache 4 heads of 512 values that serve as both keys and values, its sliding layers 16 heads of 256; MiMo V2 caches 192-wide keys and 128-wide values. |
+| Sliding-window layers | Layers listed as `sliding_attention` in `layer_types`, or marked 1 in MiMo's `hybrid_layer_pattern`, cache only the window plus one 512-token ubatch, padded to 256 cells, as llama.cpp allocates it (`src/llama-kv-cache-iswa.cpp`; gpt-oss: 768 cells on half of its layers). |
+| Different cache shapes per layer kind | Gemma 4's global layers cache 4 heads of 512-wide keys and, separately, 512-wide values (with `attention_k_eq_v` the values come from the key projection, but llama.cpp still stores both), its sliding layers 16 heads of 256; MiMo V2 caches 192-wide keys and 128-wide values. |
 | Linear-attention and state-space layers | No KV cache that grows with context: 48 of Qwen3.8 27B's 64 layers, 69 of Kimi K3's 93 (from `linear_attn_config`). |
 | KDA recurrent layers (AliceAI Foundation 80B-A3B) | 36 of 48 layers keep a fixed state rather than a context-growing KV cache. The estimate excludes that fixed state, so real serving memory can be higher. |
 | Sparse-attention indexer (DeepSeek V3.2, GLM-5) | The indexer keeps its own FP8 key per token (`index_head_dim`, 128 values), in every layer or, for GLM-5, only in the layers listed as `full` in `indexer_types`. |
@@ -82,15 +82,15 @@ default overhead; `npm run export-data` regenerates them. Totals in GiB:
 | GLM-5.3 Flash | 321.3B | 337 | 350 | 200 | 213 (1M) | 12.4 KiB |
 | GLM-5.2 | 753.3B | 1,545 | 821 | 468 | 567 (1M) | 90.4 KiB |
 | GLM-4.7 Flash | 31.2B | 64.9 | 34.9 | 20.3 | 31.1 (198K) | 52.9 KiB |
-| Gemma 4 31B | 31.3B | 65.8 | 35.7 | 21.1 | 31.7 (256K) | 40 KiB |
-| Gemma 4 26B-A4B (MoE) | 25.8B | 53.7 | 28.9 | 16.8 | 19.5 (256K) | 10 KiB |
-| Gemma 4 12B | 12.0B | 25.4 | 13.9 | 8.3 | 10.5 (256K) | 8 KiB |
-| Gemma 4 E4B | 8.0B | 17.0 | 9.4 | 5.6 | 7.7 (128K) | 16 KiB |
+| Gemma 4 31B | 31.3B | 66.6 | 36.5 | 21.9 | 43.2 (256K) | 80 KiB |
+| Gemma 4 26B-A4B (MoE) | 25.8B | 53.9 | 29.1 | 17.0 | 22.3 (256K) | 20 KiB |
+| Gemma 4 12B | 12.0B | 25.7 | 14.2 | 8.6 | 12.8 (256K) | 16 KiB |
+| Gemma 4 E4B | 8.0B | 17.1 | 9.4 | 5.6 | 7.7 (128K) | 16 KiB |
 | Kimi K3 | 2.78T | 1,600 | 3,027 | 1,724 | 1,753 (1M) | 27 KiB |
 | MiniMax M3 | 427.0B | 877 | 466 | 266 | 397 (1M) | 120 KiB |
 | MiniMax M2.7 | 228.7B | 238 | 252 | 144 | 196 (200K) | 248 KiB |
 | MiMo V2.6 Flash | 310.8B | 178 | 339 | 193 | 218 (1M) | 22.5 KiB |
-| MiMo V2.6 Pro | 1.02T | 581 | 1,116 | 636 | 690 (1M) | 50 KiB |
+| MiMo V2.6 Pro | 1.02T | 581 | 1,116 | 636 | 691 (1M) | 50 KiB |
 | Mistral Medium 3.5 128B | 127.7B | 140 | 143 | 82.7 | 176 (256K) | 352 KiB |
 | Nemotron 3 Nano 4B | 4.0B | 8.8 | 5.0 | 3.1 | 7.4 (256K) | 16 KiB |
 | Nemotron 3 Nano 30B-A3B (MoE) | 31.6B | 65.2 | 34.9 | 20.1 | 21.7 (256K) | 6 KiB |
