@@ -5,6 +5,20 @@ import type { ModelSpec } from './vram.ts';
 // model can be loaded from the Hub in the tool itself.
 export const PRESETS: ModelSpec[] = [
   {
+    id: 'paradigma-inc/limite-1b-violetto',
+    name: 'Limite 1B Violetto',
+    params: 1_035_253_888,
+    dtypes: { F32: 112_768, BF16: 1_035_141_120 },
+    layers: 48,
+    kvHeads: 2,
+    headDim: 128,
+    publishedBytes: 2_070_811_520,
+    slidingLayers: 36,
+    slidingWindow: 1025,
+    maxContext: 131_072,
+    checked: '2026-09-29',
+  },
+  {
     id: 'ornith-ai/Ornith-1.5-35B-A3B',
     name: 'Ornith 1.5 35B-A3B (MoE)',
     params: 35_951_822_704,

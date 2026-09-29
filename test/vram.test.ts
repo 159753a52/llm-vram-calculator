@@ -73,6 +73,20 @@ test('sliding-window layers stop growing at the window', () => {
   assert.equal(kvCacheBytes(gpt, 1000, 1, 16), (12 * 1000 + 12 * 128) * perLayerToken);
 });
 
+test('Limite caches 12 full layers and 36 inclusive sliding windows', () => {
+  const spec = specFromHub(
+    'paradigma-inc/limite-1b-violetto',
+    {
+      model_type: 'limite', num_hidden_layers: 48, num_attention_heads: 10,
+      num_key_value_heads: 2, head_dim: 128, sliding_window: 1024,
+      global_layers: Array.from({ length: 12 }, (_, i) => i * 4 + 3),
+    },
+    { safetensors: { total: 1_035_253_888 } },
+  );
+  assert.deepEqual([spec.slidingLayers, spec.slidingWindow], [36, 1025]);
+  assert.equal(kvCacheBytes(spec, 131_072, 1, 16), (12 * 131_072 + 36 * 1025) * 2 * 2 * 128 * 2);
+});
+
 test('linear-attention layers keep no KV cache', () => {
   const hybrid = { ...preset('Qwen/Qwen3-8B'), stateLayers: 27 };
   assert.equal(kvCacheBytes(hybrid, 10, 1, 16), 9 * 10 * 2 * 8 * 128 * 2);

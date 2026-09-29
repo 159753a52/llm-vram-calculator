@@ -112,12 +112,17 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
   const shared = Math.min(positive(config.num_kv_shared_layers) ?? 0, layers);
   if (shared) spec.sharedKvLayers = shared;
   const ownTypes = layerTypes.slice(0, layers - shared);
+  // Limite lists its full-attention layers instead of naming every layer; all others slide.
+  const limiteGlobals = config.model_type === 'limite' && Array.isArray(config.global_layers) ? config.global_layers.length : undefined;
   const slidingLayers = layerTypes.length
     ? ownTypes.filter((type) => type === 'sliding_attention').length
-    : pattern.filter((kind) => kind === 1).length;
+    : pattern.length
+      ? pattern.filter((kind) => kind === 1).length
+      : limiteGlobals === undefined ? 0 : Math.max(0, layers - limiteGlobals);
   if (slidingLayers && window) {
     spec.slidingLayers = slidingLayers;
-    spec.slidingWindow = window;
+    // Limite's local span includes the query token in addition to sliding_window history.
+    spec.slidingWindow = window + (limiteGlobals === undefined ? 0 : 1);
   }
   let stateLayers = kdaLayers;
   if (layerTypes.length) {
