@@ -9,7 +9,8 @@ day they are uploaded.
 [![ModelVRAM: GPU memory calculator for LLMs](https://modelvram.com/og/modelvram.png)](https://modelvram.com/llm-vram-calculator/)
 
 This repository is the calculation core behind [modelvram.com](https://modelvram.com): dependency-free
-TypeScript, 44 model presets and tests pinned to real checkpoint sizes and llama.cpp buffer logs.
+TypeScript, 44 model presets and tests pinned to real checkpoint sizes and llama.cpp buffer logs
+(the site itself tracks 64 models as of 2026-09-30).
 
 ## Why trust it
 
@@ -27,6 +28,10 @@ a source link). **Median error: 0.8%, largest +13.7%.** Full table, sources and 
   ([vLLM calculator](https://modelvram.com/vllm-memory-calculator/#vllm-logs)).
 - **Fine-tuning** (site calculator, not in this repo): 15 published runs, median error 1.6%, largest 7.5%
   ([fine-tuning calculator](https://modelvram.com/fine-tuning-vram-calculator/)).
+- **Prompt speed / time to first token** (site calculator, not in this repo): 32 public llama-bench runs,
+  all within ±28%, median 10% ([speed calculator](https://modelvram.com/llm-speed-calculator/#prefill-calibration)).
+- **Image and video file sizes** (site calculator, not in this repo): 6 ComfyUI load logs, all within 0.53%
+  ([image and video calculator](https://modelvram.com/image-video-vram-calculator/#calibration)).
 
 The same functions in this repo (`weightBytes`, `kvCacheBytes`, `estimate`) produce the predictions on
 that page at build time.
