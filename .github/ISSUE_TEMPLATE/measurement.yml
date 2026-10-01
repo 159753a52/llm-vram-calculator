@@ -1,27 +1,27 @@
 name: Submit a measurement
-description: Real memory use from llama.cpp, vLLM or another engine, to compare with ModelVRAM's estimate on /accuracy/.
+description: Real memory use from llama.cpp, vLLM, ComfyUI or another engine, to compare with ModelVRAM's estimates.
 title: "[measurement] <model> <quant> on <GPU>"
 labels: ["measurement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for measuring. Each submission is checked by hand before it is added to https://modelvram.com/accuracy/.
-        Paste the log lines as printed (no screenshots): the numbers are compared byte for byte with the prediction.
+        Thanks for measuring. Each submission is checked by hand before it is added to a ModelVRAM accuracy or calibration table.
+        Paste the log lines as printed (no screenshots), including units, so the measurements can be compared with the prediction.
         Please remove anything private (paths, host names, tokens) from the log before posting.
   - type: input
     id: model
     attributes:
       label: Model
-      description: Hugging Face repo of the model, e.g. Qwen/Qwen3.6-35B-A3B
+      description: Hugging Face repo or exact model name, e.g. Qwen/Qwen3.6-35B-A3B
       placeholder: Qwen/Qwen3.6-35B-A3B
     validations:
       required: true
   - type: input
     id: file
     attributes:
-      label: File / quant
-      description: GGUF file name or repo:quant, or the checkpoint and dtype for vLLM (e.g. BF16, FP8)
+      label: File(s) / quant or dtype
+      description: GGUF file name or repo:quant, or the checkpoint and dtype for vLLM (e.g. BF16, FP8). For image/video, include component filenames and dtypes (e.g. diffusion model, text encoder, VAE).
       placeholder: unsloth/Qwen3.6-35B-A3B-GGUF, Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
     validations:
       required: true
@@ -29,7 +29,7 @@ body:
     id: engine
     attributes:
       label: Engine and version
-      description: llama.cpp build number or commit (llama-server --version), vLLM version, Ollama version, ...
+      description: llama.cpp build number or commit (llama-server --version), vLLM version, Ollama version, ComfyUI version, ...
       placeholder: llama.cpp b6789 (a1b2c3d)
     validations:
       required: true
@@ -44,22 +44,24 @@ body:
   - type: input
     id: context
     attributes:
-      label: Context (-c / --max-model-len)
+      label: LLM context (-c / --max-model-len)
+      description: For LLMs, give the context length in tokens. For image/video or other workloads without this setting, enter N/A.
       placeholder: "32768"
     validations:
       required: true
   - type: input
     id: slots
     attributes:
-      label: Parallel slots (-np / --max-num-seqs)
-      description: The value the server used; llama-server prints it at start-up (n_slots / n_seq_max)
+      label: LLM parallel slots (-np / --max-num-seqs)
+      description: For LLMs, give the value the server used; llama-server prints it at start-up (n_slots / n_seq_max). For image/video or other workloads without this setting, enter N/A.
       placeholder: "1"
     validations:
       required: true
   - type: dropdown
     id: kv
     attributes:
-      label: KV cache type
+      label: LLM KV cache type
+      description: For LLMs, select the cache type used. For image/video or other workloads without a KV cache, select Not applicable.
       options:
         - f16 (default)
         - bf16
@@ -67,6 +69,7 @@ body:
         - q4_0
         - fp8 (vLLM)
         - other (say which below)
+        - Not applicable (image/video or no KV cache)
     validations:
       required: true
   - type: textarea
@@ -76,6 +79,8 @@ body:
       description: |
         llama.cpp: the "KV buffer size", "model buffer size" (CPU and GPU), "compute buffer size" lines, plus nvidia-smi (or Activity Monitor) memory with the model loaded.
         vLLM: the "Model loading took", "Available KV cache memory" and "GPU KV cache size" lines.
+        ComfyUI or other image/video workflows: model-loading log lines and/or nvidia-smi memory readings. Include component filenames/dtypes, resolution, batch size and video frame count where relevant.
+        For image/video, say whether each reading is model-loaded memory or a generation peak, and describe any CPU offload.
       render: text
       placeholder: |
         llama_kv_cache:      CUDA0 KV buffer size =   640.00 MiB
