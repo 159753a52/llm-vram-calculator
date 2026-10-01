@@ -6,11 +6,18 @@ day they are uploaded.
 
 **Use it online, free, in your browser: [modelvram.com](https://modelvram.com/llm-vram-calculator/)**
 
-[![ModelVRAM: GPU memory calculator for LLMs](https://modelvram.com/og/modelvram.png)](https://modelvram.com/llm-vram-calculator/)
+[![ModelVRAM: an illustrated Llama 3.1 8B Q4_K_M memory estimate showing weights, KV cache and overhead](assets/readme-hero.svg)](https://modelvram.com/llm-vram-calculator/)
 
 This repository is the calculation core behind [modelvram.com](https://modelvram.com): dependency-free
 TypeScript, 44 model presets and tests pinned to real checkpoint sizes and llama.cpp buffer logs
 (the site itself tracks 64 models as of 2026-09-30).
+
+## See the memory budget
+
+![For Llama 3.1 8B Q4_K_M, estimated memory rises from 6.58 GiB at 8K context to 9.88 GiB at 32K. Weights stay fixed while the FP16 KV cache grows from 1 to 4 GiB.](assets/vram-breakdown.svg)
+
+Illustrative estimates from this repository’s own formula, with one request and default overhead.
+These are not hardware benchmarks. [Try your own model and context →](https://modelvram.com/llm-vram-calculator/)
 
 ## Why trust it
 
