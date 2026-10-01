@@ -22,7 +22,9 @@ These are not hardware benchmarks. [Try your own model and context →](https://
 ## Why trust it
 
 The estimates are checked against **20 public measurements** (llama.cpp, koboldcpp and vLLM logs, each with
-a source link). **Median error: 0.8%, largest +13.7%.** Full table, sources and every miss:
+a source link). **Median absolute error across these checks: 0.8%; largest error: +13.7%.**
+The checks mix KV-cache buffers, weight buffers and whole-card totals; the 0.8% median is not a
+whole-card accuracy guarantee. See the separate results below, or the full table, sources and every miss:
 **[modelvram.com/accuracy](https://modelvram.com/accuracy/)**.
 
 - **KV cache matches llama.cpp to the byte in 8 of 8 logs**, including Gemma 4's split global/sliding cache

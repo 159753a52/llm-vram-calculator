@@ -34,3 +34,11 @@ test('README art is self-contained static SVG with accessible descriptions and w
   }
   assert.ok(readme.includes('https://modelvram.com/llm-vram-calculator/'));
 });
+
+
+test('README accuracy headline distinguishes component checks from whole-card predictions', () => {
+  const readme = readFileSync('README.md', 'utf8');
+  assert.ok(readme.includes('Median absolute error across these checks'));
+  assert.ok(readme.includes('KV-cache buffers, weight buffers and whole-card totals'));
+  assert.match(readme, /not a\s+whole-card accuracy guarantee/);
+});
