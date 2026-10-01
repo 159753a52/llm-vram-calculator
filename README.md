@@ -19,6 +19,10 @@ TypeScript, 44 model presets and tests pinned to real checkpoint sizes and llama
 Illustrative estimates from this repository’s own formula, with one request and default overhead.
 These are not hardware benchmarks. [Try your own model and context →](https://modelvram.com/llm-vram-calculator/)
 
+**Reproduce this chart offline:** after cloning the repository, run `node examples/context-budget.mjs`
+(Node 22.18+). No GPU, model download or account is needed. The [runnable example](examples/context-budget.mjs)
+prints both memory budgets and all assumptions as JSON, so you can inspect where the extra 3.30 GiB comes from.
+
 ## Why trust it
 
 The estimates are checked against **20 public measurements** (llama.cpp, koboldcpp and vLLM logs, each with
