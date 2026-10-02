@@ -130,6 +130,9 @@ const qwen = await loadFromHub('Qwen/Qwen3-14B');
 console.log(formatGib(estimate(qwen, q4, 32_768, 1, 16, 10).total));
 ```
 
+If `loadFromHub` cannot read a gated model's `config.json`, use an accessible repository
+or run the offline preset example above. The calculation core does not sign in to Hugging Face.
+
 ```text
 weights 4.52 GB, KV 4.00 GB, overhead 1.35 GB, total 9.88 GB
 RTX 3060 cards needed: 1

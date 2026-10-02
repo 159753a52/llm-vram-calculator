@@ -180,7 +180,7 @@ export async function loadFromHub(input: string): Promise<ModelSpec> {
   }
   if (!infoRes.ok) throw new Error(`Hugging Face answered ${infoRes.status}. Try again in a moment.`);
   if (configRes.status === 401 || configRes.status === 403) {
-    throw new Error(`${id} is gated, so its config.json needs a login. Enter its numbers under Advanced instead.`);
+    throw new Error(`${id} is gated, so its config.json needs a login. Use an accessible model repository or estimate a built-in preset instead.`);
   }
   if (!configRes.ok) throw new Error(`${id} has no readable config.json (${configRes.status}).`);
 
