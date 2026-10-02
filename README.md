@@ -59,7 +59,7 @@ total    = weights + KV cache + overhead
 weights  = parameters × bits per weight ÷ 8
 KV cache = full layers    × cells         × values per token per layer × KV bits ÷ 8
          + sliding layers × sliding cells × values per token per layer × KV bits ÷ 8
-         + cells × indexer layers × index dim            (sparse-attention indexer, FP8)
+         + cells × indexer layers × indexer bytes per row  (layout-specific; see below)
 overhead = 0.5 GiB + (weights + KV cache) × overhead %   (10% by default)
 ```
 
@@ -79,6 +79,16 @@ the stored dtypes, counting MXFP4 `U8` tensors as 4.25 bits.
 - Linear-attention / Mamba / recurrent layers and layers that reuse an earlier cache (Gemma 4 E models) hold
   no context-growing cache and are left out.
 - KV bits: 16 (FP16/BF16), 8 (FP8), 8.5 (Q8_0), 4.5 (Q4_0).
+- Ordinary DeepSeek-style indexers store one FP8 key per row. GLM-5.3-Flash uses the
+  source-checked `glm5-next-kpool` layout: `3 × indexDim × KV bits ÷ 8` bytes per row,
+  for key, gate and pooled values at the selected K-cache precision. Pooling does not divide
+  the allocated context rows. Its 512-value MLA and 384-value indexer rows are both aligned to
+  GGML's 32-value blocks: Q8_0 uses 34 bytes per block; Q4_0 uses 18.
+  This follows [llama.cpp 5fc4f3c](https://github.com/ggml-org/llama.cpp/blob/5fc4f3c8c7103ffd0b7ff5ee4855bcc78a3ed5cd/src/llama-memory-hybrid-idx.cpp#L53-L73),
+  not a universal runtime contract or a GPU measurement. With FP16 and one request,
+  the context-growing cache is 616 MiB at 32K and 2,464 MiB at 128K. Fixed recurrent state,
+  MTP and scratch buffers are separate; quantized storage arithmetic does not establish
+  kernel support (including the generic FP8 option).
 
 **Multi-GPU.** A GPU group of 1, 2, 4 or 8 cards fits when each card holds
 `(weights + KV cache) ÷ n × (1 + overhead %) + 0.5 GiB`.
@@ -160,7 +170,7 @@ npm run export-data
 | Per-layer cache shapes | Gemma 4's global layers (4 × 512, K and V stored separately even with `attention_k_eq_v`) vs sliding (16 × 256); MiMo V2's 192-wide K / 128-wide V. |
 | Linear attention / state-space | No context-growing cache: Qwen3-Next's `full_attention_interval`, Kimi's `linear_attn_config`, Nemotron-H's `hybrid_override_pattern`. |
 | KDA recurrent layers (AliceAI 80B-A3B) | Fixed state excluded, so real serving memory can be higher. |
-| Sparse-attention indexer (DeepSeek V3.2, GLM-5) | Its own FP8 key per token (`index_head_dim`), in every or only `full` layers. |
+| Sparse-attention indexer (DeepSeek V3.2, GLM-5) | Its own FP8 key per token (`index_head_dim`), in every or only `full` layers; GLM-5.3-Flash instead stores three vectors in the selected K dtype, as described above. |
 | KV sharing (Gemma 4 E models) | `num_kv_shared_layers` keep no cache of their own. |
 | Cross-layer compression (DeepSeek V4) | Not modelled: the KV figure is flagged as an upper bound. |
 | Multimodal checkpoints | Language model numbers read from `text_config`. |

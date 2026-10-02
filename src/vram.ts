@@ -48,11 +48,16 @@ export type ModelSpec = {
   /** Multi-head latent attention (DeepSeek V2/V3): values cached per token per layer. */
   mlaDim?: number;
   /**
-   * DeepSeek sparse attention (DeepSeek V3.2, GLM-5): the indexer also caches `indexDim` FP8
-   * values per token, in `indexLayers` layers (every full-attention layer unless shared).
+   * Sparse-attention indexer head width, in `indexLayers` layers (every full-attention layer
+   * unless shared). The default stores one FP8 key; `indexCache` selects a known exception.
    */
   indexDim?: number;
   indexLayers?: number;
+  /**
+   * GLM-5-Next in llama.cpp 5fc4f3c stores key | gate | pooled (3 × indexDim) in the selected
+   * K-cache dtype for every context row. Undefined preserves the ordinary FP8 indexer.
+   */
+  indexCache?: 'glm5-next-kpool';
   /** Layers that keep only the last `slidingWindow` tokens. */
   slidingLayers?: number;
   slidingWindow?: number;
@@ -72,7 +77,7 @@ export type ModelSpec = {
   maxContext?: number;
   /** Date the model's public files were checked, when newer than the preset snapshot. */
   checked?: string;
-  /** Shown next to the result when the cache is known to be smaller than modelled here. */
+  /** Cache-layout assumptions and limitations shown next to the result. */
   kvNote?: string;
 };
 
@@ -169,7 +174,7 @@ export function slidingCells(window: number, context: number, requests = 1): num
 /**
  * KV cache for `requests` sequences of `context` tokens each, as llama.cpp allocates it:
  * full-attention layers keep K and V for every cell, sliding-window layers keep `slidingCells`,
- * and the DeepSeek sparse-attention indexer adds its FP8 keys.
+ * and the sparse-attention indexer adds its own cache.
  */
 export function kvCacheBytes(spec: ModelSpec, context: number, requests: number, kvBits: number): number {
   const attentionLayers = cachingLayers(spec);
@@ -179,21 +184,26 @@ export function kvCacheBytes(spec: ModelSpec, context: number, requests: number,
   const slidingTokens = spec.slidingWindow ? slidingCells(spec.slidingWindow, context, requests) : cells;
   const values =
     full * cells * kvValuesPerTokenPerLayer(spec) + sliding * slidingTokens * slidingValuesPerTokenPerLayer(spec);
-  return (values * kvBits) / 8 + cells * indexerBytesPerToken(spec);
+  return (values * kvBits) / 8 + cells * indexerBytesPerToken(spec, kvBits);
 }
 
-/** The sparse-attention indexer's own cache, kept in FP8 whatever the KV cache precision. */
-function indexerBytesPerToken(spec: ModelSpec): number {
+/** The indexer's own cache: ordinary DSA uses FP8; GLM-5-Next k-pool follows the K dtype. */
+function indexerBytesPerToken(spec: ModelSpec, kvBits: number): number {
   if (!spec.indexDim) return 0;
   const attentionLayers = Math.max(0, cachingLayers(spec) - (spec.slidingLayers ?? 0));
-  return Math.min(spec.indexLayers ?? attentionLayers, attentionLayers) * spec.indexDim;
+  // https://github.com/ggml-org/llama.cpp/blob/5fc4f3c8c7103ffd0b7ff5ee4855bcc78a3ed5cd/src/llama-memory-hybrid-idx.cpp#L53-L73
+  // Pooling does not divide the number of allocated rows.
+  // The supported 3 × 128 row is 32-value block aligned: Q8_0 uses 12 × 34 bytes and
+  // Q4_0 uses 12 × 18 bytes, exactly the existing 8.5 / 4.5 effective-bit input.
+  const rowBytes = spec.indexCache === 'glm5-next-kpool' ? (3 * spec.indexDim * kvBits) / 8 : spec.indexDim;
+  return Math.min(spec.indexLayers ?? attentionLayers, attentionLayers) * rowBytes;
 }
 
 /** Cache added by each extra token of one request once every sliding window is full. */
 export function kvGrowthPerToken(spec: ModelSpec, kvBits: number): number {
   const attentionLayers = cachingLayers(spec);
   const full = attentionLayers - Math.min(spec.slidingLayers ?? 0, attentionLayers);
-  return (full * kvValuesPerTokenPerLayer(spec) * kvBits) / 8 + indexerBytesPerToken(spec);
+  return (full * kvValuesPerTokenPerLayer(spec) * kvBits) / 8 + indexerBytesPerToken(spec, kvBits);
 }
 
 /** Memory every GPU needs no matter how small the model: the CUDA context and allocator pools. */

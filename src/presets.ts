@@ -276,6 +276,8 @@ export const PRESETS: ModelSpec[] = [
     mlaDim: 512,
     indexDim: 128,
     indexLayers: 45,
+    indexCache: 'glm5-next-kpool',
+    kvNote: 'GLM-5-Next cache uses llama.cpp 5fc4f3c: the indexer stores key, gate and pooled values at the selected KV precision for every context row. Fixed recurrent state, MTP and scratch buffers are excluded. Quantized sizes do not establish kernel support or measured GPU memory.',
     stateLayers: 34,
     maxContext: 1_048_576,
   },

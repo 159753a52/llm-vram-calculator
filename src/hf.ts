@@ -73,6 +73,15 @@ export function specFromHub(id: string, rawConfig: HubConfig, info: HubInfo, fil
     spec.indexDim = indexDim;
     const indexerTypes = Array.isArray(config.indexer_types) ? config.indexer_types : [];
     if (indexerTypes.length) spec.indexLayers = indexerTypes.filter((type) => type === 'full').length;
+    // Only the source-checked GLM-5-Next layout gets the three-slot, selected-K-dtype cache.
+    if (config.model_type === 'glm5_next_text' && indexDim === 128 && config.index_kpool === 4 && config.index_kpool_compress === true) {
+      spec.indexCache = 'glm5-next-kpool';
+      spec.kvNote =
+        'GLM-5-Next cache uses llama.cpp 5fc4f3c: the indexer stores key, gate and pooled values at the selected KV precision for every context row. Fixed recurrent state, MTP and scratch buffers are excluded. Quantized sizes do not establish kernel support or measured GPU memory.';
+    } else if ((positive(config.index_kpool) ?? 0) > 1 || config.index_kpool_compress === true) {
+      spec.kvNote =
+        'This pooled sparse-attention indexer layout is not modelled; its cache figure is an approximation and may be too low.';
+    }
   }
   const vHeadDim = positive(config.v_head_dim);
   if (!kvLoraRank && vHeadDim && vHeadDim !== headDim) spec.vHeadDim = vHeadDim;
