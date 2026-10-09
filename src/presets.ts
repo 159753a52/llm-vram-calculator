@@ -5,6 +5,24 @@ import type { ModelSpec } from './vram.ts';
 // model can be loaded from the Hub in the tool itself.
 export const PRESETS: ModelSpec[] = [
   {
+    id: 'Aleph-Alpha/Kolibri-1',
+    name: 'Kolibri-1 (MoE)',
+    params: 78_103_074_560,
+    dtypes: { BF16: 705_058_560, F8_E4M3: 77_398_016_000 },
+    layers: 50,
+    kvHeads: 4,
+    headDim: 128,
+    experts: 384,
+    publishedBytes: 78_841_467_208,
+    quantMethod: 'fp8',
+    slidingLayers: 40,
+    slidingWindow: 513,
+    maxContext: 262_144,
+    activeParams: 3_457_573_120,
+    checked: '2026-10-09',
+    kvNote: 'Kolibri-1 is served with Aleph Alpha’s vLLM plugin. The tables use this site’s FP16 cache and runtime allowance; the publisher evaluates an FP8 cache and recommends up to 262,144 tokens for serving. Its validated 1,048,576-token setting needs explicit overrides. GGUF sizes here are estimates, not verified compatible downloads.',
+  },
+  {
     id: 'paradigma-inc/limite-1b-violetto',
     name: 'Limite 1B Violetto',
     params: 1_035_253_888,
