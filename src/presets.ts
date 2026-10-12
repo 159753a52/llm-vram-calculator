@@ -5,6 +5,23 @@ import type { ModelSpec } from './vram.ts';
 // model can be loaded from the Hub in the tool itself.
 export const PRESETS: ModelSpec[] = [
   {
+    // LightOn's OCR model (released 2026-10-06) on the Qwen3.5-4B vision-language architecture. One
+    // BF16 model.safetensors of 9,078,620,536 bytes; its header (revision b71010f) splits the
+    // parameters into 4,205,751,296 for the language model and 333,514,240 for the vision encoder.
+    id: 'lightonai/LightOnOCR-3-4B',
+    name: 'LightOnOCR-3 4B',
+    params: 4_539_265_536,
+    dtypes: { BF16: 4_539_265_536 },
+    layers: 32,
+    kvHeads: 4,
+    headDim: 256,
+    publishedBytes: 9_078_620_536,
+    stateLayers: 24,
+    maxContext: 262_144,
+    checked: '2026-10-12',
+    kvNote: 'Only the 8 full-attention layers keep a KV cache. The 24 linear-attention layers hold a fixed state per request (48 MB in FP32), left to the overhead allowance, as is the vision encoder’s working memory while it reads a page. A page takes about 1,800 to 4,800 image tokens depending on its render size, plus its output: 1,158 tokens on average for plain transcription, 1,433 with grounding.',
+  },
+  {
     id: 'Aleph-Alpha/Kolibri-1',
     name: 'Kolibri-1 (MoE)',
     params: 78_103_074_560,
